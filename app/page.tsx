@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { Car, Building2, Shield, Users, ArrowRight, Zap, CheckCircle, KeyRound } from "lucide-react";
 import { STORAGE_KEYS, UserRole, SessionUser, Agency } from "@/components/saas-mock";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function LandingHubPage() {
   const router = useRouter();
@@ -21,23 +22,27 @@ export default function LandingHubPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [agencyCity, setAgencyCity] = useState("");
 
-  // Simulation de connexion rapide pour les tests de rôles
-  const handleFastLogin = async (role: UserRole, agencyNameStr: string, site: string) => {
-    const mockUser: SessionUser = {
-      id: `USR-${Math.floor(Math.random() * 900) + 100}`,
-      name: `${role} (${agencyNameStr})`,
-      email: `${role.toLowerCase().replace(" ", "")}@test.cd`,
-      role: role,
-      agencyId: role === "Super Admin SaaS" ? null : "AGE-101",
-      siteAccess: site
-    };
+ 
 
-    // Sauvegarde de la session active dans localforage
-    await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, mockUser);
-    
-    // Redirection vers le cœur de l'application
-    router.push("/settings"); // On redirige temporairement vers settings pour valider l'UI
+// À l'intérieur de votre composant LandingHubPage :
+const loginStore = useAuthStore((state) => state.login);
+
+const handleFastLogin = async (role: UserRole, agencyNameStr: string, site: string) => {
+  const mockUser: SessionUser = {
+    id: `USR-${Math.floor(Math.random() * 900) + 100}`,
+    name: `${role} (${agencyNameStr})`,
+    email: `${role.toLowerCase().replace(" ", "")}@test.cd`,
+    role: role,
+    agencyId: role === "Super Admin SaaS" ? null : "AGE-101",
+    siteAccess: site
   };
+
+  // Met à jour Zustand + localforage d'un seul coup !
+  await loginStore(mockUser);
+  
+  // Redirection automatique vers le Dashboard
+  router.push("/dashboard");
+};
 
   // Traitement de l'inscription d'une nouvelle agence
   const handleRegisterAgency = async (e: React.FormEvent) => {

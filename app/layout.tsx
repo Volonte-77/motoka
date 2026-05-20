@@ -1,34 +1,20 @@
-import type { Metadata } from "next";
-import { AuthProvider } from "@/context/auth-context";
-import { Geist, Geist_Mono } from "next/font/google";
+"use client";
+
+import { useEffect } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
 
-export const metadata: Metadata = {
-  title: "Motoka App",
-  description: "Gestion logistique de terrain",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
- return (
-    <html lang="fr" className="dark"> 
-      <body className="bg-zinc-50 dark:bg-[#09090b] transition-colors duration-200">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+  return (
+    <html lang="fr" className="dark">
+      <body className="bg-zinc-50 dark:bg-[#09090b] transition-colors duration-200 antialiased">
+        {children}
       </body>
     </html>
   );
