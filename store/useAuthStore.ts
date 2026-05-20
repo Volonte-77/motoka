@@ -14,7 +14,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: true,
 
-  // Initialisation : charge la session au démarrage depuis localforage
   initializeAuth: async () => {
     try {
       const savedSession = await localforage.getItem<SessionUser>(STORAGE_KEYS.CURRENT_SESSION);
@@ -25,13 +24,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  // Connexion de l'utilisateur
   login: async (userSession) => {
     set({ user: userSession });
     await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, userSession);
   },
 
-  // Déconnexion de l'utilisateur
   logout: async () => {
     set({ user: null });
     await localforage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
