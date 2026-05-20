@@ -77,12 +77,12 @@ export default function CoursesPage() {
               placeholder="Rechercher par Axe, Chauffeur, Véhicule..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
+              className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
             />
           </div>
           
           {/* Basculeur de vue Grid / Table */}
-          <div className="flex items-center gap-1 bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
+          <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="icon"
@@ -133,7 +133,7 @@ export default function CoursesPage() {
             <Card 
               key={trip.id} 
               onClick={() => openDetails(trip)}
-              className="border-zinc-800 bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
+              className="border-zinc-800 bg-white dark:bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
             >
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-start justify-between">
@@ -169,7 +169,7 @@ export default function CoursesPage() {
 
       {/* RENDU 2 : TABLEAU */}
       {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-[#121214]">
+        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
           <table className="w-full text-sm text-left text-zinc-400">
             <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
               <tr>
@@ -225,7 +225,7 @@ export default function CoursesPage() {
 
       {/* MODAL : FEUILLE DE ROUTE DE LA COURSE */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
+        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
           <DialogHeader>
             <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
               <Milestone size={14}/> Feuille de Route Opérationnelle

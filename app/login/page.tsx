@@ -28,7 +28,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <Card className="border border-zinc-800 bg-[#121214]">
+        <Card className="border border-zinc-800 bg-white dark:bg-[#121214]">
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl font-semibold text-white">Connexion</CardTitle>
             <CardDescription className="text-zinc-400">

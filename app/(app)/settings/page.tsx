@@ -86,7 +86,7 @@ export default function SettingsPage() {
       </div>
 
       {/* BLOC 1 : PERSONNALISATION DU THÈME */}
-      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+      <Card className="border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 bg-white dark:bg-white dark:bg-[#121214]">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
             Thème Visuel
@@ -102,7 +102,7 @@ export default function SettingsPage() {
             className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all cursor-pointer text-sm font-medium ${
               theme === "dark"
                 ? "border-primary bg-primary/5 text-primary"
-                : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                : "border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
             }`}
           >
             <Moon size={22} />
@@ -115,7 +115,7 @@ export default function SettingsPage() {
             className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all cursor-pointer text-sm font-medium ${
               theme === "light"
                 ? "border-primary bg-primary/5 text-primary"
-                : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                : "border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
             }`}
           >
             <Sun size={22} />
@@ -125,7 +125,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* BLOC 2 : NOTIFICATIONS & CONFIGURATIONS */}
-      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+      <Card className="border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 bg-white dark:bg-white dark:bg-[#121214]">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
             <Bell size={18} className="text-zinc-500"/> Préférences Système

@@ -25,7 +25,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     
     {/* 1. SIDEBAR */}
     <aside className={cn(
-      "fixed top-0 left-0 z-40 h-screen bg-white dark:bg-[#121214] border-r border-zinc-200 dark:border-zinc-800 transition-transform md:translate-x-0 hidden md:flex flex-col justify-between",
+      "fixed top-0 left-0 z-40 h-screen bg-white dark:bg-white dark:bg-[#121214] border-r border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 transition-transform md:translate-x-0 hidden md:flex flex-col justify-between",
       sidebarOpen ? "w-64" : "w-20"
     )}>
         {/* Header Sidebar */}
@@ -84,7 +84,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         sidebarOpen ? "md:pl-64" : "md:pl-20"
       )}>
         {/* Header mobile rapide */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-[#121214] border-b border-zinc-800 sticky top-0 z-30">
+        <header className="md:hidden flex items-center justify-between p-4 bg-white dark:bg-[#121214] border-b border-zinc-800 sticky top-0 z-30">
           <span className="font-bold tracking-wider text-lg">
             MO<span className="text-primary">TO</span>KA
           </span>
@@ -100,7 +100,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
       </div>
 
       {/* 3. BOTTOM BAR (MOBILE ONLY) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#121214]/95 backdrop-blur-md border-t border-zinc-800 h-16 flex items-center justify-around px-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#121214]/95 backdrop-blur-md border-t border-zinc-800 h-16 flex items-center justify-around px-2">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;

@@ -73,12 +73,12 @@ export default function VehiculesPage() {
               placeholder="Rechercher par modèle ou plaque..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
+              className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
             />
           </div>
           
           {/* Boutons de choix de rendu (Invisible ou désactivé astucieusement sur petit mobile pour forcer le grid) */}
-          <div className="flex items-center gap-1 bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
+          <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="icon"
@@ -130,7 +130,7 @@ export default function VehiculesPage() {
             <Card 
               key={vehicle.id} 
               onClick={() => openDetails(vehicle)}
-              className="border-zinc-800 bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
+              className="border-zinc-800 bg-white dark:bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
             >
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-start justify-between gap-2">
@@ -165,7 +165,7 @@ export default function VehiculesPage() {
 
       {/* RENDU 2 : VUE EN TABLEAU PROFESSIONNEL */}
       {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-[#121214]">
+        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
           <table className="w-full text-sm text-left text-zinc-400">
             <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
               <tr>
@@ -221,7 +221,7 @@ export default function VehiculesPage() {
 
       {/* JOLIE MODAL : FICHE TECHNIQUE DU VÉHICULE */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
+        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
           <DialogHeader>
             <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
               {selectedVehicle && getTypeIcon(selectedVehicle.type)} Fiche Technique

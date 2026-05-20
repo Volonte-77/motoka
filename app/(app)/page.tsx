@@ -12,7 +12,7 @@ export default function DashboardPage() {
 
         {/* Grille de stats rapides (Mobile friendly : 1 col sur mobile, 3 sur desktop) */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="border-zinc-800 bg-[#121214]">
+          <Card className="border-zinc-800 bg-white dark:bg-[#121214]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-400">Courses Aujourd'hui</CardTitle>
             </CardHeader>
@@ -22,7 +22,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-800 bg-[#121214]">
+          <Card className="border-zinc-800 bg-white dark:bg-[#121214]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-400">Colis en Attente</CardTitle>
             </CardHeader>
@@ -32,7 +32,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-800 bg-[#121214] sm:col-span-2 lg:col-span-1">
+          <Card className="border-zinc-800 bg-white dark:bg-[#121214] sm:col-span-2 lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-400">Recettes du jour</CardTitle>
             </CardHeader>
