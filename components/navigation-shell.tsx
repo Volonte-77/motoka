@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard }, // Devient la racine de l'application connectée
   { name: "Chauffeurs", href: "/chauffeurs", icon: Users },
+  {name: "Véhicules", href: "/vehicules", icon: Car }, // Ajouté ici
   { name: "Courses", href: "/courses", icon: Car },
   { name: "Colis", href: "/colis", icon: Package },
   { name: "Paramètres", href: "/settings", icon: Settings },
