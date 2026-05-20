@@ -25,7 +25,7 @@ export default function CoursesPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   
   // États de l'UI
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [selectedTrip, setSelectedTrip] = useState<typeof initialTrips[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
