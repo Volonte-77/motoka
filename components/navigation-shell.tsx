@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
 
 // Définition des liens de navigation principaux
 const navigationItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Chauffeurs", href: "/dashboard/chauffeurs", icon: Users }, // Changé ici
-  { name: "Courses", href: "/dashboard/courses", icon: Car },
-  { name: "Colis", href: "/dashboard/colis", icon: Package },
-  { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard }, // Devient la racine de l'application connectée
+  { name: "Chauffeurs", href: "/chauffeurs", icon: Users },
+  { name: "Courses", href: "/courses", icon: Car },
+  { name: "Colis", href: "/colis", icon: Package },
+  { name: "Paramètres", href: "/settings", icon: Settings },
 ];
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
