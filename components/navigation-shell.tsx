@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Car, Package, Users, Settings, LogOut, Menu } from "lucide-react";
+import { LayoutDashboard, Car, Package, Users, Settings, LogOut, Menu, Wallet, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Définition des liens de navigation principaux
@@ -13,6 +13,8 @@ const navigationItems = [
   {name: "Véhicules", href: "/vehicules", icon: Car }, // Ajouté ici
   { name: "Courses", href: "/courses", icon: Car },
   { name: "Colis", href: "/colis", icon: Package },
+  { name: "Caisse", href: "/caisse", icon: Wallet }, // Ajouté pour la finance agence
+  { name: "Super Admin", href: "/super-admin", icon: ShieldAlert }, //
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
 
