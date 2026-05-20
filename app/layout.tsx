@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "@/context/auth-context";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -25,7 +26,9 @@ export default function RootLayout({
  return (
     <html lang="fr" className="dark"> 
       <body className="bg-zinc-50 dark:bg-[#09090b] transition-colors duration-200">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
