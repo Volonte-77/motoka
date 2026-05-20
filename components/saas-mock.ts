@@ -1,5 +1,6 @@
 export type SubscriptionPlan = "Basique" | "Standard" | "Premium";
 export type SubscriptionStatus = "Actif" | "Expiré" | "Essai";
+export type UserRole = "Super Admin SaaS" | "Admin Agence" | "Dispatcher / Opérateur" | "Chauffeur" | "Client";
 
 export interface Agency {
   id: string;
@@ -27,3 +28,18 @@ export const defaultAgencies: Agency[] = [
   { id: "AGE-002", name: "Kivu Motors", email: "info@kivumotors.com", city: "Beni", plan: "Standard", status: "Essai", expiresAt: "2026-06-15", createdAt: "2026-05-01" },
   { id: "AGE-003", name: "Virunga Voyage", email: "direction@virunga.cd", city: "Butembo", plan: "Basique", status: "Expiré", expiresAt: "2026-04-20", createdAt: "2025-10-05" },
 ];
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  agencyId: string | null; // null pour le Super Admin SaaS
+  siteAccess: string;       // "Global" ou le nom d'un site spécifique (ex: "Goma Dépôt")
+}
+
+// Clés constantes pour localforage
+export const STORAGE_KEYS = {
+  CURRENT_SESSION: "motoka_current_session",
+  AGENCIE_LIST: "saas_agencies_data",
+};
