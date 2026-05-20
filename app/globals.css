@@ -118,7 +118,35 @@
   --sidebar-border: oklch(0.228 0.006 285.89);
   --sidebar-ring: oklch(0.696 0.17 149.21);
 }
+/* --- PERSONNALISATION DES SCROLLBARS GLOBALES --- */
 
+/* Taille de la scrollbar */
+::-webkit-scrollbar {
+  width: 6px;  /* Pour le défilement vertical */
+  height: 6px; /* Pour le défilement horizontal (ex: filtres ou tableaux) */
+}
+
+/* Fond de la piste (Track) */
+::-webkit-scrollbar-track {
+  background: #09090b; 
+}
+
+/* Barre de défilement elle-même (Thumb) */
+::-webkit-scrollbar-thumb {
+  background: #27272a; /* zinc-800 */
+  border-radius: 9999px;
+}
+
+/* Couleur au survol */
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46; /* zinc-700 */
+}
+
+/* Optionnel : Pour Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #27272a #09090b;
+}
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -4,26 +4,44 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Phone, Car, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { 
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
+} from "@/components/ui/dialog";
+import { 
+  Plus, Search, Users, Phone, Car, ShieldAlert, CheckCircle2, 
+  LayoutGrid, List, Eye, IdCard as IdentificationCard, FileText, Star
+} from "lucide-react";
 
-// Données fictives pour concevoir l'interface
+// Données fictives enrichies pour les chauffeurs
 const initialDrivers = [
-  { id: "1", name: "Jean-Pierre Kasongo", phone: "+243 991 234 567", vehicle: "Bus Coaster - C042", status: "Disponible" },
-  { id: "2", name: "Marc Mbusa", phone: "+243 812 345 678", vehicle: "Toyota Probox - T108", status: "En mission" },
-  { id: "3", name: "Alain Paluku", phone: "+243 973 456 789", vehicle: "Moto Kijima - M009", status: "Hors service" },
+  { id: "1", name: "Jean-Pierre Kasongo", phone: "+243 991 234 567", vehicle: "Bus Coaster - C042", status: "Disponible", license: "Catégorie ABC", rating: "4.8", joinedDate: "14/09/2025" },
+  { id: "2", name: "Marc Mbusa", phone: "+243 812 345 678", vehicle: "Toyota Probox - T108", status: "En mission", license: "Catégorie B", rating: "4.5", joinedDate: "02/11/2025" },
+  { id: "3", name: "Alain Paluku", phone: "+243 973 456 789", vehicle: "Moto Kijima - M009", status: "Hors service", license: "Catégorie A", rating: "4.9", joinedDate: "20/01/2026" },
+  { id: "4", name: "Sarah Masika", phone: "+243 824 567 890", vehicle: "Aucun (En attente)", status: "Disponible", license: "Catégorie B", rating: "4.7", joinedDate: "05/04/2026" },
 ];
 
 export default function ChauffeursPage() {
   const [drivers] = useState(initialDrivers);
   const [search, setSearch] = useState("");
+  
+  // États pour le mode d'affichage et le modal de détails
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [selectedDriver, setSelectedDriver] = useState<typeof initialDrivers[0] | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filteredDrivers = drivers.filter(driver => 
-    driver.name.toLowerCase().includes(search.toLowerCase())
+    driver.name.toLowerCase().includes(search.toLowerCase()) || 
+    driver.phone.includes(search)
   );
+
+  const openDetails = (driver: typeof initialDrivers[0]) => {
+    setSelectedDriver(driver);
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="space-y-6">
-      {/* En-tête de la page */}
+      {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion des Chauffeurs</h1>
@@ -35,72 +53,218 @@ export default function ChauffeursPage() {
         </Button>
       </div>
 
-      {/* Barre de Recherche */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-        <Input
-          type="text"
-          placeholder="Rechercher un chauffeur par son nom..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
-        />
+      {/* Barre de contrôle : Recherche + Basculeur de vue */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+          <Input
+            type="text"
+            placeholder="Rechercher par nom ou numéro de téléphone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
+          />
+        </div>
+        
+        {/* Basculeur de vue Grid / Table */}
+        <div className="flex items-center gap-1 bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("grid")}
+            className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
+            data-variant={viewMode === "grid" ? "secondary" : "ghost"}
+          >
+            <LayoutGrid size={16} />
+          </Button>
+          <Button
+            variant={viewMode === "table" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setViewMode("table")}
+            className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
+            data-variant={viewMode === "table" ? "secondary" : "ghost"}
+          >
+            <List size={16} />
+          </Button>
+        </div>
       </div>
 
-      {/* Liste Mobile-First (Grille s'adaptant de 1 colonne à 3 colonnes) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredDrivers.map((driver) => (
-          <Card key={driver.id} className="border-zinc-800 bg-[#121214] overflow-hidden hover:border-zinc-700 transition-colors">
-            <CardContent className="p-4 space-y-4">
-              
-              {/* Ligne Supérieure : Nom & Statut */}
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-semibold text-white text-base">{driver.name}</h3>
-                  <p className="text-xs text-zinc-500">ID Chauffeur: #00{driver.id}</p>
-                </div>
+      {/* RENDU 1 : VUE EN CARTES (GRID) */}
+      {viewMode === "grid" && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredDrivers.map((driver) => (
+            <Card 
+              key={driver.id} 
+              onClick={() => openDetails(driver)}
+              className="border-zinc-800 bg-[#121214] overflow-hidden hover:border-zinc-700 transition-colors cursor-pointer"
+            >
+              <CardContent className="p-4 space-y-4">
                 
-                {/* Badge de Statut Cyber-Précis */}
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                  driver.status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                  driver.status === "En mission" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                  "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    driver.status === "Disponible" ? "bg-emerald-400" :
-                    driver.status === "En mission" ? "bg-amber-400" :
-                    "bg-zinc-400"
-                  }`} />
-                  {driver.status}
-                </span>
-              </div>
-
-              {/* Infos Contact & Véhicule */}
-              <div className="space-y-2 text-sm text-zinc-400 border-t border-zinc-800/60 pt-3">
-                <div className="flex items-center gap-2.5">
-                  <Phone size={15} className="text-zinc-500" />
-                  <span>{driver.phone}</span>
+                {/* Entête Carte : Nom & Statut */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold text-white text-base">{driver.name}</h3>
+                    <p className="text-xs text-zinc-500">ID Chauffeur: #00{driver.id}</p>
+                  </div>
+                  
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                    driver.status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                    driver.status === "En mission" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                    "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                  }`}>
+                    {driver.status}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <Car size={15} className="text-zinc-500" />
-                  <span>{driver.vehicle}</span>
+
+                {/* Données de contact rapides */}
+                <div className="space-y-2 text-sm text-zinc-400 border-t border-zinc-800/60 pt-3">
+                  <div className="flex items-center gap-2.5">
+                    <Phone size={14} className="text-zinc-500" />
+                    <span>{driver.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Car size={14} className="text-zinc-500" />
+                    <span>{driver.vehicle}</span>
+                  </div>
+                </div>
+
+                {/* Ligne inférieure de la carte */}
+                <div className="text-xs text-zinc-500 flex justify-between items-center pt-1">
+                  <div className="flex items-center gap-1 text-amber-400">
+                    <Star size={12} fill="currentColor"/> <span>{driver.rating}</span>
+                  </div>
+                  <span className="text-primary hover:underline flex items-center gap-1">Profil <Eye size={12}/></span>
+                </div>
+
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* RENDU 2 : VUE EN TABLEAU */}
+      {viewMode === "table" && (
+        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-[#121214]">
+          <table className="w-full text-sm text-left text-zinc-400">
+            <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
+              <tr>
+                <th className="px-4 py-3">Chauffeur / ID</th>
+                <th className="px-4 py-3">Téléphone</th>
+                <th className="px-4 py-3">Véhicule Assigné</th>
+                <th className="px-4 py-3">Note</th>
+                <th className="px-4 py-3">Statut</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/50">
+              {filteredDrivers.map((driver) => (
+                <tr 
+                  key={driver.id} 
+                  onClick={() => openDetails(driver)}
+                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
+                >
+                  <td className="px-4 py-3 font-medium text-white">
+                    <div className="flex flex-col">
+                      <span>{driver.name}</span>
+                      <span className="text-xs text-zinc-500">#00{driver.id}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-300">{driver.phone}</td>
+                  <td className="px-4 py-3 text-zinc-300">{driver.vehicle}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1 text-amber-400 text-xs">
+                      <Star size={12} fill="currentColor"/> {driver.rating}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                      driver.status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                      driver.status === "En mission" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                      "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                    }`}>
+                      {driver.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" onClick={() => openDetails(driver)} className="text-zinc-400 hover:text-white h-7">
+                      Profil
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* MODAL PRÉCIS : PROFIL DÉTAILLÉ DU CHAUFFEUR */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
+              <Users size={14}/> Fiche Chauffeur
+            </div>
+            <DialogTitle className="text-2xl font-bold tracking-tight text-white">
+              {selectedDriver?.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Inscrit le {selectedDriver?.joinedDate}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Corps d'informations du profil */}
+          <div className="space-y-4 my-2 border-t border-b border-zinc-800/80 py-4 text-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-xs text-zinc-500 uppercase font-medium">Contact direct</span>
+                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
+                  <Phone size={14} className="text-zinc-500"/>{selectedDriver?.phone}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-zinc-500 uppercase font-medium">Type de Permis</span>
+                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
+                  <IdentificationCard size={14} className="text-zinc-500"/>{selectedDriver?.license}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-zinc-500 uppercase font-medium">Véhicule Actuel</span>
+                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
+                  <Car size={14} className="text-zinc-500"/>{selectedDriver?.vehicle}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-zinc-500 uppercase font-medium">Note Globale</span>
+                <p className="text-amber-400 font-medium flex items-center gap-1">
+                  <Star size={14} fill="currentColor"/> {selectedDriver?.rating} / 5
+                </p>
+              </div>
+            </div>
+
+            {/* Statut du dossier / Documents (Look pro) */}
+            <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-zinc-400" />
+                <div className="text-xs">
+                  <p className="text-zinc-200 font-medium">Vérification des documents</p>
+                  <p className="text-zinc-500">Permis & Dossier médical à jour</p>
                 </div>
               </div>
+              <CheckCircle2 size={18} className="text-emerald-400" />
+            </div>
+          </div>
 
-              {/* Actions rapides de terrain */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button variant="outline" className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs h-9 cursor-pointer">
-                  Voir Profil
-                </Button>
-                <Button variant="outline" className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 text-xs h-9 cursor-pointer">
-                  Courses
-                </Button>
-              </div>
-
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          {/* Boutons d'actions */}
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer">
+              Fermer
+            </Button>
+            <Button className="bg-primary text-primary-foreground hover:opacity-90 cursor-pointer">
+              Modifier le profil
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
