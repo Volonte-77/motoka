@@ -37,6 +37,10 @@ export interface AppUser extends SessionUser {
   password?: string;
   phone?: string;
   vehicleAssigned?: string;
+  joinedDate?: string;
+  license?: string;
+  vehicle?:string;
+  rating?:string;
 }
 
 // Données par défaut pour tester le Super Admin

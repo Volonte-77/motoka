@@ -1,171 +1,155 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import localforage from "localforage";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Shield, Bell, Save, CheckCircle2 } from "lucide-react";
-
-// Clé unique pour stocker nos paramètres dans localforage
-const SETTINGS_KEY = "motoka_user_settings";
+import { Badge } from "@/components/ui/badge";
+import { STORAGE_KEYS, AppUser, Agency } from "@/components/saas-mock";
+import { Settings, User, Building2, MapPin, Save, Plus, AlertCircle } from "lucide-react";
 
 export default function SettingsPage() {
-  // 1. États locaux pour nos configurations
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [notifications, setNotifications] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaved, setIsSaved] = useState(false);
+  const { user } = useAuthStore();
+  const [agencyData, setAgencyData] = useState<Agency | null>(null);
+  
+  const [userName, setUserName] = useState(user?.name || "");
+  const [userPhone, setUserPhone] = useState("");
+  const [newBranchName, setNewBranchName] = useState("");
 
-  // 2. Apprentissage Pas à Pas : Charger les données au démarrage
   useEffect(() => {
     const loadSettings = async () => {
-      try {
-        // localforage.getItem va chercher la valeur de manière asynchrone dans l'IndexedDB du navigateur
-        const savedSettings = await localforage.getItem<{ theme: "dark" | "light"; notifications: boolean }>(SETTINGS_KEY);
-        
-        if (savedSettings) {
-          setTheme(savedSettings.theme);
-          setNotifications(savedSettings.notifications);
-          
-          // Appliquer immédiatement le thème chargé au document HTML
-          applyTheme(savedSettings.theme);
-        } else {
-          // Si rien n'est stocké, on applique le thème par défaut (dark)
-          applyTheme("dark");
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement de localforage :", error);
-      } finally {
-        setIsLoading(false);
+      if (user?.agencyId) {
+        const agencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
+        const match = agencies.find(a => a.id === user.agencyId);
+        if (match) setAgencyData(match);
+
+        const users = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+        const found = users.find(u => u.id === user.id);
+        if (found?.phone) setUserPhone(found.phone);
       }
     };
-
     loadSettings();
-  }, []);
+  }, [user]);
 
-  // 3. Fonction utilitaire pour injecter/retirer la classe 'dark' de Tailwind
-  const applyTheme = (currentTheme: "dark" | "light") => {
-    const root = window.document.documentElement;
-    if (currentTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+  const handleSaveProfile = async () => {
+    const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+    const updated = allUsers.map(u => u.id === user?.id ? { ...u, name: userName, phone: userPhone } : u);
+    await localforage.setItem(STORAGE_KEYS.USERS_LIST, updated);
+    alert("Profil personnel mis à jour !");
   };
 
-  // 4. Apprentissage Pas à Pas : Sauvegarder les données
-  const handleSaveSettings = async () => {
-    setIsSaved(false);
-    try {
-      const settingsToSave = { theme, notifications };
-      
-      // localforage.setItem(clé, valeur) sérialise et stocke l'objet automatiquement
-      await localforage.setItem(SETTINGS_KEY, settingsToSave);
-      
-      // Appliquer le thème sélectionné en direct
-      applyTheme(theme);
-      
-      // Déclencher le message de succès temporaire
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
-    } catch (error) {
-      console.error("Erreur de sauvegarde localforage :", error);
-    }
-  };
+  const handleAddBranch = async () => {
+    if (!agencyData || !newBranchName) return;
 
-  if (isLoading) {
-    return <div className="text-sm text-zinc-400">Chargement de vos configurations...</div>;
-  }
+    // Protection par paliers d'abonnement
+    const branches = agencyData.branches || [];
+    if (agencyData.plan === "Basique") {
+      alert("Le plan Basique est restreint au site d'exploitation initial. Évoluez vers l'offre Standard pour ajouter d'autres terminaux.");
+      return;
+    }
+    if (agencyData.plan === "Standard" && branches.length >= 3) {
+      alert("Le plan Standard limite votre parc à 3 succursales physiques interconnectées. Passez à la licence Premium.");
+      return;
+    }
+
+    const updatedBranches = [...branches, newBranchName];
+    const allAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
+    const updatedAgencies = allAgencies.map(a => a.id === agencyData.id ? { ...a, branches: updatedBranches } : a);
+
+    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, updatedAgencies);
+    setAgencyData({ ...agencyData, branches: updatedBranches });
+    setNewBranchName("");
+  };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* En-tête */}
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white text-zinc-900">Paramètres de l'application</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Personnalisez votre espace de travail et gérez vos préférences locales.</p>
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+          <Settings size={20} className="text-primary"/> Paramètres de Configuration
+        </h1>
+        <p className="text-xs text-zinc-500">Gestion de vos préférences de compte et de vos autorisations logistiques.</p>
       </div>
 
-      {/* BLOC 1 : PERSONNALISATION DU THÈME */}
-      <Card className="border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 bg-white dark:bg-white dark:bg-[#121214]">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-            Thème Visuel
-          </CardTitle>
-          <CardDescription className="text-zinc-500 dark:text-zinc-400">
-            Choisissez l'apparence de l'interface Motoka selon votre environnement de travail.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          {/* Option Mode Sombre */}
-          <button
-            onClick={() => setTheme("dark")}
-            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all cursor-pointer text-sm font-medium ${
-              theme === "dark"
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-            }`}
-          >
-            <Moon size={22} />
-            <span>Mode Sombre</span>
-          </button>
-
-          {/* Option Mode Clair */}
-          <button
-            onClick={() => setTheme("light")}
-            className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-3 transition-all cursor-pointer text-sm font-medium ${
-              theme === "light"
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-            }`}
-          >
-            <Sun size={22} />
-            <span>Mode Clair</span>
-          </button>
-        </CardContent>
-      </Card>
-
-      {/* BLOC 2 : NOTIFICATIONS & CONFIGURATIONS */}
-      <Card className="border-zinc-200 dark:border-zinc-800 dark:border-zinc-800 bg-white dark:bg-white dark:bg-[#121214]">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-            <Bell size={18} className="text-zinc-500"/> Préférences Système
+      {/* ESPACE COMPTE PERSONNEL (Chauffeurs & Admins) */}
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+            <User size={14} className="text-primary"/> Identité & Contact Opérationnel
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-lg border border-zinc-100 dark:border-zinc-800/60">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium text-zinc-900 dark:text-white">Alertes de livraison</p>
-              <p className="text-xs text-zinc-500">Activer les popups lors de la validation d'un OTP Colis.</p>
+        <CardContent className="p-4 pt-2 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-[11px] text-zinc-400">Nom d'usage sur le réseau</label>
+              <Input value={userName} onChange={e => setUserName(e.target.value)} className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs h-9" />
             </div>
-            <input 
-              type="checkbox" 
-              checked={notifications} 
-              onChange={(e) => setNotifications(e.target.checked)}
-              className="w-4 h-4 accent-primary cursor-pointer"
-            />
+            <div className="space-y-1">
+              <label className="text-[11px] text-zinc-400">Téléphone Mobile de terrain</label>
+              <Input value={userPhone} onChange={e => setUserPhone(e.target.value)} placeholder="+243..." className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs h-9" />
+            </div>
           </div>
+          <Button onClick={handleSaveProfile} size="sm" className="bg-primary text-black font-semibold text-xs h-8 cursor-pointer flex items-center gap-1">
+            <Save size={12}/> Sauvegarder mes modifications
+          </Button>
         </CardContent>
       </Card>
 
-      {/* BARRE D'ACTIONS INFERIEURE */}
-      <div className="flex items-center justify-between pt-2">
-        <div className="flex items-center gap-2 text-emerald-500 text-sm font-medium transition-opacity">
-          {isSaved && (
-            <>
-              <CheckCircle2 size={16} />
-              <span>Configurations enregistrées en local !</span>
-            </>
-          )}
+      {/* ESPACE DIRECTEUR : CONFIGURATION MULTI-SITES AGENT */}
+      {user?.role === "Admin Agence" && agencyData && (
+        <div className="space-y-6 pt-2">
+          <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+            <CardHeader className="p-4 pb-2">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <Building2 size={14} className="text-primary"/> Propriétés de la Licence Agence
+                </CardTitle>
+                <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold">
+                  FORFAIT {agencyData.plan} ({agencyData.status})
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-2 space-y-2 text-xs text-zinc-400 font-mono">
+              <p>• Identifiant Fiscal : {agencyData.id}</p>
+              <p>• Expiration de Licence : {agencyData.expiresAt}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                <MapPin size={14} className="text-primary"/> Déploiement de Terminaux & Succursales
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-2 space-y-4">
+              <div className="flex gap-2 max-w-sm">
+                <Input value={newBranchName} onChange={e => setNewBranchName(e.target.value)} placeholder="Ex: Butembo Dépôt" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs h-9" />
+                <Button onClick={handleAddBranch} size="sm" className="bg-white text-black font-semibold text-xs h-9 flex items-center gap-1 whitespace-nowrap cursor-pointer">
+                  <Plus size={14}/> Connecter le Site
+                </Button>
+              </div>
+
+              {agencyData.plan !== "Premium" && (
+                <p className="text-[11px] text-amber-500 bg-amber-500/10 p-2 rounded-lg max-w-sm flex items-center gap-1 font-mono">
+                  <AlertCircle size={12}/> Restriction de l'offre {agencyData.plan} active.
+                </p>
+              )}
+
+              <div className="space-y-1.5 pt-1">
+                <p className="text-xs font-semibold text-zinc-400">Réseau d'agences physiques actives :</p>
+                <div className="flex flex-wrap gap-2">
+                  {(agencyData.branches || [agencyData.city]).map((branch, i) => (
+                    <span key={i} className="text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1 rounded-md font-medium text-zinc-700 dark:text-zinc-300">
+                      {branch}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        
-        <Button 
-          onClick={handleSaveSettings}
-          className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 cursor-pointer font-medium"
-        >
-          <Save size={16} />
-          Sauvegarder les modifications
-        </Button>
-      </div>
+      )}
     </div>
   );
 }

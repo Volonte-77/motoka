@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import localforage from "localforage";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,27 +11,90 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Plus, Search, Car, Truck, Bike, Wrench, Navigation, 
-  LayoutGrid, List, Eye, Calendar, ShieldCheck, Milestone
+  LayoutGrid, List, Eye, Calendar, ShieldCheck, Milestone, UserCheck
 } from "lucide-react";
 
-// Données fictives des véhicules
+// Clé de stockage partagée
+const STORAGE_KEYS = {
+  VEHICLES_LIST: "volenium_vehicles_list"
+};
+
+// Données fictives initiales adaptées
 const initialVehicles = [
-  { id: "1", model: "Toyota HiAce (Coaster)", plate: "C042-GMA", type: "Bus", status: "Disponible", owner: "Agence Goma Centre", mileage: "45,200 km", lastService: "12/04/2026" },
-  { id: "2", model: "Toyota Probox", plate: "T108-GMA", type: "Taxi", status: "Mission", owner: "Agence Goma Centre", mileage: "128,000 km", lastService: "02/05/2026" },
-  { id: "3", model: "Fuso Fighter", plate: "C901-GMA", type: "Camion", status: "Maintenance", owner: "Antenne Beni", mileage: "89,450 km", lastService: "19/05/2026" },
-  { id: "4", model: "Kijima 150", plate: "M009-GMA", type: "Moto", status: "Disponible", owner: "Antenne Butembo", mileage: "12,100 km", lastService: "28/03/2026" },
-  { id: "5", model: "Suzuki Alto", plate: "T220-GMA", type: "Taxi", status: "Hors service", owner: "Agence Goma Centre", mileage: "210,000 km", lastService: "10/01/2026" },
+  { id: "VEH-001", model: "Toyota HiAce (Coaster)", plate: "C042-GMA", type: "Bus", status: "Disponible", owner: "Agence Interne", mileage: "45,200 km", lastService: "12/04/2026", agencyId: "AGE-001" },
+  { id: "VEH-002", model: "Toyota Probox", plate: "T108-GMA", type: "Taxi", status: "Mission", owner: "Agence Interne", mileage: "128,000 km", lastService: "02/05/2026", agencyId: "AGE-001" },
+  { id: "VEH-003", model: "Fuso Fighter", plate: "C901-GMA", type: "Camion", status: "Maintenance", owner: "Agence Interne", mileage: "89,450 km", lastService: "19/05/2026", agencyId: "AGE-001" },
+  { id: "VEH-004", model: "Suzuki Alto", plate: "T220-GMA", type: "Taxi", status: "Hors service", owner: "Chauffeur Partenaire", mileage: "210,000 km", lastService: "10/01/2026", agencyId: "AGE-001" },
 ];
 
 export default function VehiculesPage() {
-  const [vehicles] = useState(initialVehicles);
+  const { user } = useAuthStore();
+  
+  // États de données réelles
+  const [vehicles, setVehicles] = useState<typeof initialVehicles>([]);
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   
-  // États pour la gestion de l'affichage et du modal
+  // États pour la gestion de l'affichage et des modaux
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [selectedVehicle, setSelectedVehicle] = useState<typeof initialVehicles[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // États du formulaire d'enrôlement de véhicule
+  const [newModel, setNewModel] = useState("");
+  const [newPlate, setNewPlate] = useState("");
+  const [newType, setNewType] = useState("Taxi");
+  const [newMileage, setNewMileage] = useState("");
+  const [isPartnerOwner, setIsPartnerOwner] = useState(false); // Gère si le véhicule est propre au chauffeur adhérent
+  const [ownerName, setOwnerName] = useState("");
+
+  // Charger le parc automobile depuis localforage filtré par l'agence de l'admin
+  const loadVehiclesData = async () => {
+    let allVehicles = await localforage.getItem<typeof initialVehicles>(STORAGE_KEYS.VEHICLES_LIST) || [];
+    
+    if (allVehicles.length === 0 && user?.agencyId) {
+      const demoVehicles = initialVehicles.map(v => ({
+        ...v,
+        agencyId: user.agencyId
+      }));
+      let allVehicles = demoVehicles;
+      await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, allVehicles);
+    }
+
+    const agencyVehicles = allVehicles.filter(v => v.agencyId === user?.agencyId);
+    setVehicles(agencyVehicles);
+  };
+
+  useEffect(() => {
+    loadVehiclesData();
+  }, [user]);
+
+  // Enregistrement du nouveau véhicule en BDD
+  const handleAddVehicleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newModel || !newPlate) return;
+
+    const newVehicleItem = {
+      id: `VEH-${Math.floor(Math.random() * 900) + 100}`,
+      model: newModel,
+      plate: newPlate.toUpperCase(),
+      type: newType,
+      status: "Disponible",
+      owner: isPartnerOwner ? `Chauffeur (${ownerName || "Partenaire"})` : "Agence Interne",
+      mileage: newMileage ? `${parseInt(newMileage).toLocaleString()} km` : "0 km",
+      lastService: new Date().toLocaleDateString("fr-FR"),
+      agencyId: user?.agencyId || "AGE-001"
+    };
+
+    const allVehicles = await localforage.getItem<typeof initialVehicles>(STORAGE_KEYS.VEHICLES_LIST) || [];
+    await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, [...allVehicles, newVehicleItem]);
+
+    // Reset du formulaire
+    setNewModel(""); setNewPlate(""); setNewMileage(""); setIsPartnerOwner(false); setOwnerName("");
+    setIsAddModalOpen(false);
+    loadVehiclesData();
+  };
 
   const filteredVehicles = vehicles.filter(v => {
     const matchesSearch = v.model.toLowerCase().includes(search.toLowerCase()) || v.plate.toLowerCase().includes(search.toLowerCase());
@@ -58,7 +123,7 @@ export default function VehiculesPage() {
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion du Parc Automobile</h1>
           <p className="text-sm text-zinc-400">Suivi en temps réel des véhicules, de leur disponibilité et de leur état technique.</p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
+        <Button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
           <Plus size={18} /> Ajouter un véhicule
         </Button>
       </div>
@@ -77,7 +142,7 @@ export default function VehiculesPage() {
             />
           </div>
           
-          {/* Boutons de choix de rendu (Invisible ou désactivé astucieusement sur petit mobile pour forcer le grid) */}
+          {/* Basculeur de vue */}
           <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -139,9 +204,14 @@ export default function VehiculesPage() {
                       <span className="text-zinc-500">{getTypeIcon(vehicle.type)}</span>
                       <h3 className="text-base tracking-tight">{vehicle.model}</h3>
                     </div>
-                    <span className="inline-block bg-zinc-800 text-zinc-400 font-mono text-xs px-2 py-0.5 rounded border border-zinc-700/50">
-                      {vehicle.plate}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="inline-block bg-zinc-800 text-zinc-400 font-mono text-[10px] px-2 py-0.5 rounded border border-zinc-700/50 w-fit">
+                        {vehicle.plate}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                        Propriétaire: <span className="text-zinc-400 font-medium">{vehicle.owner}</span>
+                      </span>
+                    </div>
                   </div>
 
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
@@ -163,7 +233,7 @@ export default function VehiculesPage() {
         </div>
       )}
 
-      {/* RENDU 2 : VUE EN TABLEAU PROFESSIONNEL */}
+      {/* RENDU 2 : VUE EN TABLEAU */}
       {viewMode === "table" && (
         <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
           <table className="w-full text-sm text-left text-zinc-400">
@@ -171,6 +241,7 @@ export default function VehiculesPage() {
               <tr>
                 <th className="px-4 py-3">Véhicule / Plaque</th>
                 <th className="px-4 py-3">Catégorie</th>
+                <th className="px-4 py-3">Propriétaire</th>
                 <th className="px-4 py-3">Kilométrage</th>
                 <th className="px-4 py-3">Dernier Entretien</th>
                 <th className="px-4 py-3">Statut</th>
@@ -195,6 +266,7 @@ export default function VehiculesPage() {
                       {getTypeIcon(vehicle.type)} {vehicle.type}
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-zinc-300 text-xs">{vehicle.owner}</td>
                   <td className="px-4 py-3 text-zinc-300">{vehicle.mileage}</td>
                   <td className="px-4 py-3 text-zinc-500">{vehicle.lastService}</td>
                   <td className="px-4 py-3">
@@ -219,7 +291,72 @@ export default function VehiculesPage() {
         </div>
       )}
 
-      {/* JOLIE MODAL : FICHE TECHNIQUE DU VÉHICULE */}
+      {/* MODAL 1 : FORMULAIRE D'AJOUT ET COMPTE CONDUCTEUR PROPRE */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Car size={18} className="text-primary"/> Enregistrer un véhicule
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Ajoutez un élément au parc automobile ou le véhicule d'un chauffeur adhérent.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddVehicleSubmit} className="space-y-3 pt-2">
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-zinc-400">Modèle du véhicule</label>
+              <Input value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="Ex: Toyota Probox 2018" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Plaque d'Immatriculation</label>
+                <Input value={newPlate} onChange={e => setNewPlate(e.target.value)} placeholder="Ex: 4819AB-19" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white font-mono" required />
+              </div>
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Kilométrage initial (km)</label>
+                <Input type="number" value={newMileage} onChange={e => setNewMileage(e.target.value)} placeholder="Ex: 45000" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
+              </div>
+            </div>
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-zinc-400">Catégorie</label>
+              <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
+                <option value="Taxi">Taxi / Voiture citadine</option>
+                <option value="Bus">Bus / Coaster</option>
+                <option value="Camion">Camion logistique</option>
+                <option value="Moto">Moto</option>
+              </select>
+            </div>
+
+            {/* Commutateur Adhésion Chauffeur avec son propre véhicule */}
+            <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-zinc-300 flex items-center gap-1.5">
+                  <UserCheck size={14} className="text-primary"/> Véhicule propre au chauffeur ?
+                </span>
+                <input 
+                  type="checkbox" 
+                  checked={isPartnerOwner} 
+                  onChange={e => setIsPartnerOwner(e.target.checked)}
+                  className="accent-primary h-3.5 w-3.5 cursor-pointer"
+                />
+              </div>
+              {isPartnerOwner && (
+                <div className="space-y-0.5 pt-1 border-t border-zinc-800/50">
+                  <label className="text-[9px] text-zinc-400">Nom du Chauffeur propriétaire</label>
+                  <Input value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Ex: Alain Paluku" className="bg-zinc-950 border-zinc-800 text-[11px] h-7 text-white" required={isPartnerOwner} />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)} className="border-zinc-800 text-zinc-300 h-8 text-xs cursor-pointer">Annuler</Button>
+              <Button type="submit" className="bg-primary text-black font-bold h-8 text-xs cursor-pointer">Sauvegarder</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 2 : FICHE TECHNIQUE DU VÉHICULE */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
           <DialogHeader>
@@ -234,11 +371,10 @@ export default function VehiculesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Grille d'informations détaillées */}
           <div className="space-y-4 my-2 border-t border-b border-zinc-800/80 py-4 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Affectation</span>
+                <span className="text-xs text-zinc-500 uppercase font-medium">Régime de Propriété</span>
                 <p className="text-zinc-200 font-medium flex items-center gap-1.5"><ShieldCheck size={14} className="text-zinc-500"/>{selectedVehicle?.owner}</p>
               </div>
               <div className="space-y-1">
@@ -256,7 +392,6 @@ export default function VehiculesPage() {
             </div>
           </div>
 
-          {/* Actions à l'intérieur du Modal */}
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer">
               Fermer

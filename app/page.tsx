@@ -1,287 +1,256 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import localforage from "localforage";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Car, Building2, Shield, Users, ArrowRight, Zap, CheckCircle, KeyRound } from "lucide-react";
-import { STORAGE_KEYS, UserRole, SessionUser, Agency } from "@/components/saas-mock";
-import { useAuthStore } from "@/store/useAuthStore";
+import { Building2, ArrowRight, Zap, CheckCircle, KeyRound, UserPlus, LogIn } from "lucide-react";
+import { STORAGE_KEYS, AppUser, Agency, SubscriptionPlan, defaultAgencies } from "@/components/saas-mock";
 
-export default function LandingHubPage() {
+export default function LandingPage() {
   const router = useRouter();
+  const loginStore = useAuthStore((state) => state.login);
+
+  // Modals
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"Basique" | "Standard" | "Premium">("Standard");
-  
-  // Formulaires
-  const [agencyName, setAgencyName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [agencyCity, setAgencyCity] = useState("");
 
- 
+  // Login
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
 
-// À l'intérieur de votre composant LandingHubPage :
-const loginStore = useAuthStore((state) => state.login);
+  // Inscription
+  const [regAgencyName, setRegAgencyName] = useState("");
+  const [regAdminName, setRegAdminName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regCity, setRegCity] = useState("");
+  const [regPlan, setRegPlan] = useState<SubscriptionPlan>("Standard");
 
-const handleFastLogin = async (role: UserRole, agencyNameStr: string, site: string) => {
-  const mockUser: SessionUser = {
-    id: `USR-${Math.floor(Math.random() * 900) + 100}`,
-    name: `${role} (${agencyNameStr})`,
-    email: `${role.toLowerCase().replace(" ", "")}@test.cd`,
-    role: role,
-    agencyId: role === "Super Admin SaaS" ? null : "AGE-101",
-    siteAccess: site
+  // Ensemencer localforage avec l'existant au premier chargement
+  useEffect(() => {
+    const seedDatabase = async () => {
+      const currentAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST);
+      if (!currentAgencies || currentAgencies.length === 0) {
+        await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, defaultAgencies);
+      }
+
+      const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST);
+      if (!currentUsers || currentUsers.length === 0) {
+        // Injection d'utilisateurs par défaut pour vos tests de rôles
+        const initialUsers: AppUser[] = [
+          { id: "USR-SUPER", name: "Alpha Volenium", email: "admin@motoka.cd", password: "admin", role: "Super Admin SaaS", agencyId: null, siteAccess: "Global" },
+          { id: "USR-KASONGO", name: "Papa Kasongo", email: "kasongo@mail.cd", password: "password", role: "Admin Agence", agencyId: "AGE-001", siteAccess: "Global" },
+          { id: "USR-CHAUFFEUR", name: "Chauffeur Kakule", email: "driver@mail.cd", password: "driver", role: "Chauffeur", agencyId: "AGE-001", siteAccess: "Bus C01" }
+        ];
+        await localforage.setItem(STORAGE_KEYS.USERS_LIST, initialUsers);
+      }
+    };
+    seedDatabase();
+  }, []);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+
+    const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+    const foundUser = allUsers.find(u => u.email === loginEmail && u.password === loginPassword);
+
+    if (foundUser) {
+      await loginStore({
+        id: foundUser.id,
+        name: foundUser.name,
+        email: foundUser.email,
+        role: foundUser.role,
+        agencyId: foundUser.agencyId,
+        siteAccess: foundUser.siteAccess
+      });
+      setIsLoginOpen(false);
+      
+      // Routeur applicatif adaptif
+      if (foundUser.role === "Super Admin SaaS") router.push("/super-admin");
+      else if (foundUser.role === "Chauffeur") router.push("/courses");
+      else router.push("/dashboard");
+    } else {
+      setLoginError("Identifiants incorrects ou agence introuvable.");
+    }
   };
 
-  // Met à jour Zustand + localforage d'un seul coup !
-  await loginStore(mockUser);
-  
-  // Redirection automatique vers le Dashboard
-  router.push("/dashboard");
-};
-
-  // Traitement de l'inscription d'une nouvelle agence
-  const handleRegisterAgency = async (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agencyName || !adminEmail || !agencyCity) return;
-
     const newAgencyId = `AGE-${Math.floor(Math.random() * 900) + 100}`;
-    
-    // 1. Créer l'agence
+    const newUserId = `USR-${Math.floor(Math.random() * 900) + 100}`;
+
     const newAgency: Agency = {
       id: newAgencyId,
-      name: agencyName,
-      email: adminEmail,
-      city: agencyCity,
-      plan: selectedPlan,
+      name: regAgencyName,
+      email: regEmail,
+      city: regCity,
+      plan: regPlan,
       status: "Actif",
       expiresAt: "2026-12-31",
-      createdAt: "2026-05-20"
+      createdAt: "2026-05-20",
+      branches: [regCity + " Direction"]
     };
 
-    // 2. Récupérer la liste existante des agences et pousser la nouvelle
-    const existingAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, [...existingAgencies, newAgency]);
-
-    // 3. Ouvrir directement la session en tant qu'Admin de cette nouvelle agence
-    const newAdminUser: SessionUser = {
-      id: "USR-001",
-      name: `Directeur ${agencyName}`,
-      email: adminEmail,
+    const newAdmin: AppUser = {
+      id: newUserId,
+      name: regAdminName,
+      email: regEmail,
+      password: regPassword,
       role: "Admin Agence",
       agencyId: newAgencyId,
       siteAccess: "Global"
     };
 
-    await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, newAdminUser);
+    const agencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
+    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, [...agencies, newAgency]);
+
+    const users = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+    await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...users, newAdmin]);
+
+    await loginStore({
+      id: newAdmin.id,
+      name: newAdmin.name,
+      email: newAdmin.email,
+      role: newAdmin.role,
+      agencyId: newAgencyId,
+      siteAccess: "Global"
+    });
+
     setIsRegisterOpen(false);
-    router.push("/utilisateurs"); // Redirection vers sa gestion d'abonnement
+    router.push("/dashboard");
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white flex flex-col justify-between p-6 antialiased selection:bg-primary selection:text-black">
-      
-      {/* 1. BRANDING / HEADER */}
+    <div className="min-h-screen bg-[#09090b] text-white flex flex-col justify-between p-6 antialiased">
       <header className="max-w-6xl w-full mx-auto flex justify-between items-center py-4">
         <div className="flex items-center gap-2">
-          <div className="bg-primary text-black p-1.5 rounded-lg font-black tracking-tighter text-sm">M</div>
-          <span className="text-xl font-bold tracking-tight">MOTOKA <span className="text-primary text-xs font-mono font-bold">SaaS v2</span></span>
+          <div className="bg-primary text-black p-1.5 rounded-lg font-black text-sm">M</div>
+          <span className="text-xl font-bold tracking-tight">MOTOKA <span className="text-primary text-xs font-mono">SaaS</span></span>
         </div>
-        <Button 
-          onClick={() => setIsRegisterOpen(true)}
-          className="bg-primary text-black hover:opacity-95 text-xs font-semibold h-9 cursor-pointer"
-        >
-          Déployer votre Agence <ArrowRight size={14} className="ml-1"/>
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setIsLoginOpen(true)} variant="ghost" className="text-xs font-semibold h-9 text-zinc-400 hover:text-white cursor-pointer">
+            Portail d'accès
+          </Button>
+          <Button onClick={() => setIsRegisterOpen(true)} className="bg-primary text-black hover:opacity-95 text-xs font-semibold h-9 cursor-pointer">
+            Déployer votre Agence
+          </Button>
+        </div>
       </header>
 
-      {/* 2. MAIN HERO & ACTION HUB */}
-      <main className="max-w-4xl w-full mx-auto my-auto py-12 grid gap-10 md:grid-cols-2 items-center">
-        <div className="space-y-6">
-          <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs py-1 px-3 rounded-full font-mono">
-            Système d'Exploitation Logistique Multi-Sites
-          </Badge>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight leading-tight">
-            Pilotez votre flotte de transport partout en <span className="text-primary">RDC</span>.
-          </h1>
-          <p className="text-zinc-400 text-sm md:text-base leading-relaxed">
-            Une infrastructure cloud unique pour centraliser vos guichets, sécuriser vos colis par OTP, et auditer vos revenus en temps réel depuis n'importe quelle succursale.
-          </p>
+      <main className="max-w-3xl w-full mx-auto text-center my-auto py-16 space-y-6">
+        <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs py-1 px-3 rounded-full font-mono">
+          Ecosystem Logistics v2
+        </Badge>
+        <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-none">
+          L'infrastructure numérique du transport routier en <span className="text-primary">RDC</span>.
+        </h1>
+        <p className="text-zinc-400 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+          Gérez votre flotte multi-sites, vos billetteries unifiées, et vos audits de caisse en temps réel.
+        </p>
+        <div className="pt-2">
+          <Button onClick={() => setIsRegisterOpen(true)} className="bg-white text-black font-bold h-11 px-6 text-xs rounded-xl flex items-center gap-2 cursor-pointer hover:bg-zinc-200">
+            Créer un compte Agence <ArrowRight size={14}/>
+          </Button>
         </div>
-
-        {/* PANNEAU DE CONNEXION RAPIDE (SIMULATION DE TERRAIN) */}
-        <Card className="border-zinc-800 bg-[#121214] p-6 space-y-4 shadow-2xl">
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <KeyRound className="text-primary" size={18}/> Portail d'Authentification
-            </h2>
-            <p className="text-xs text-zinc-500 mt-1">Sélectionnez un profil pour simuler le comportement du routeur applicatif.</p>
-          </div>
-
-          <div className="space-y-2 pt-2">
-            <button 
-              onClick={() => handleFastLogin("Super Admin SaaS", "Motoka Core", "Global")}
-              className="w-full text-left p-3 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-primary/50 transition-all flex items-center justify-between text-xs font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Shield size={16} className="text-primary"/>
-                <div>
-                  <p className="text-zinc-200">Super Admin SaaS</p>
-                  <p className="text-[10px] text-zinc-500 font-mono">Contrôle global des licences</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-zinc-600"/>
-            </button>
-
-            <button 
-              onClick={() => handleFastLogin("Admin Agence", "Kasongo Express", "Global")}
-              className="w-full text-left p-3 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-primary/50 transition-all flex items-center justify-between text-xs font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Building2 size={16} className="text-blue-400"/>
-                <div>
-                  <p className="text-zinc-200">Admin Agence (Maison Kasongo)</p>
-                  <p className="text-[10px] text-zinc-500 font-mono">Vue financière consolidée multi-sites</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-zinc-600"/>
-            </button>
-
-            <button 
-              onClick={() => handleFastLogin("Dispatcher / Opérateur", "Kasongo Express", "Beni Dépôt")}
-              className="w-full text-left p-3 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-primary/50 transition-all flex items-center justify-between text-xs font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Users size={16} className="text-emerald-400"/>
-                <div>
-                  <p className="text-zinc-200">Opérateur de Guichet</p>
-                  <p className="text-[10px] text-zinc-500 font-mono">Restreint au site de : Beni Dépôt</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-zinc-600"/>
-            </button>
-
-            <button 
-              onClick={() => handleFastLogin("Chauffeur", "Kasongo Express", "Bus C042")}
-              className="w-full text-left p-3 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-primary/50 transition-all flex items-center justify-between text-xs font-medium cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Car size={16} className="text-amber-400"/>
-                <div>
-                  <p className="text-zinc-200">Chauffeur Routier</p>
-                  <p className="text-[10px] text-zinc-500 font-mono">Feuille de route uniquement</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-zinc-600"/>
-            </button>
-          </div>
-        </Card>
       </main>
 
-      {/* 3. MODAL DE CRÉATION D'AGENCE / PROCES DE SOUSCRIPTION */}
-      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
-        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-lg rounded-xl overflow-y-auto max-h-[90vh]">
+      {/* MODAL CONNEXION */}
+      <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
+        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Building2 className="text-primary"/> Déployer une nouvelle Agence
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <KeyRound className="text-primary" size={18}/> Authentification
             </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs">
-              Remplissez les informations de votre entreprise et sélectionnez votre plan de licence d'exploitation.
-            </DialogDescription>
           </DialogHeader>
+          <form onSubmit={handleLoginSubmit} className="space-y-4 pt-2">
+            {loginError && <p className="text-xs text-rose-500 bg-rose-500/10 p-2 rounded-lg">{loginError}</p>}
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-zinc-400">Email professionnel</label>
+              <Input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="nom@kasongo.cd" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-zinc-400">Mot de passe</label>
+              <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
+            </div>
+            <Button type="submit" className="w-full bg-primary text-black font-bold text-xs h-10 cursor-pointer">
+              <LogIn size={14} className="mr-1"/> Se connecter
+            </Button>
+          </form>
+          <div className="text-[10px] text-zinc-500 border-t border-zinc-800 mt-2 pt-2 space-y-1 font-mono">
+            <p>• Super Admin : admin@motoka.cd / admin</p>
+            <p>• Agence Admin : kasongo@mail.cd / password</p>
+            <p>• Chauffeur : driver@mail.cd / driver</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-          <form onSubmit={handleRegisterAgency} className="space-y-4 pt-2">
+      {/* MODAL INSCRIPTION AGENCE */}
+      <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
+        <DialogContent className="bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Building2 className="text-primary" size={18}/> Formulaire d'Adhésion SaaS
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRegisterSubmit} className="space-y-4 pt-1">
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-zinc-400">Raison Sociale de l'Agence</label>
+              <Input value={regAgencyName} onChange={e => setRegAgencyName(e.target.value)} placeholder="Ex: Volenium Trans" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-400">Nom de l'Agence</label>
-                <Input 
-                  placeholder="Ex: Volenium Express" 
-                  value={agencyName} onChange={e => setAgencyName(e.target.value)}
-                  className="bg-zinc-900 border-zinc-800 text-xs text-white" required
-                />
+                <label className="text-[11px] font-medium text-zinc-400">Nom Administrateur</label>
+                <Input value={regAdminName} onChange={e => setRegAdminName(e.target.value)} placeholder="Votre nom" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-400">Ville du Siège Social</label>
-                <Input 
-                  placeholder="Ex: Goma" 
-                  value={agencyCity} onChange={e => setAgencyCity(e.target.value)}
-                  className="bg-zinc-900 border-zinc-800 text-xs text-white" required
-                />
+                <label className="text-[11px] font-medium text-zinc-400">Ville d'origine</label>
+                <Input value={regCity} onChange={e => setRegCity(e.target.value)} placeholder="Ex: Beni" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-zinc-400">Email de contact</label>
+                <Input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="admin@volenium.cd" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-zinc-400">Mot de passe de sécurité</label>
+                <Input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-400">Email du Directeur (Admin)</label>
-              <Input 
-                type="email" placeholder="directeur@volenium.cd" 
-                value={adminEmail} onChange={e => setAdminEmail(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white" required
-              />
-            </div>
-
-            {/* SÉLECTEUR DE FORFAIT EN DIRECT DANS LE FORMULAIRE */}
-            <div className="space-y-2 pt-1">
-              <label className="text-xs font-medium text-zinc-400 block">Sélectionnez votre niveau d'infrastructure</label>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-zinc-400 block">Niveau de licence</label>
               <div className="grid grid-cols-3 gap-2">
                 {(["Basique", "Standard", "Premium"] as const).map((plan) => (
                   <div
-                    key={plan}
-                    onClick={() => setSelectedPlan(plan)}
-                    className={`p-3 rounded-lg border text-center cursor-pointer transition-all ${
-                      selectedPlan === plan 
-                        ? "border-primary bg-primary/5 text-primary" 
-                        : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700"
+                    key={plan} onClick={() => setRegPlan(plan)}
+                    className={`p-2.5 rounded-lg border text-center cursor-pointer transition-all ${
+                      regPlan === plan ? "border-primary bg-primary/5 text-primary" : "border-zinc-800 bg-zinc-900/50 text-zinc-400"
                     }`}
                   >
                     <p className="text-xs font-bold">{plan}</p>
-                    <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
-                      {plan === "Basique" ? "50$" : plan === "Standard" ? "120$" : "250$"} / m
-                    </p>
+                    <p className="text-[9px] font-mono mt-0.5 text-zinc-500">{plan === "Basique" ? "50$" : plan === "Standard" ? "120$" : "250$"}/m</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Avantages du plan sélectionné */}
-            <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-[11px] text-zinc-400 space-y-1.5">
-              <p className="font-semibold text-zinc-300 flex items-center gap-1">
-                <Zap size={12} className="text-primary fill-primary"/> Inclus dans le Forfait {selectedPlan} :
-              </p>
-              {selectedPlan === "Basique" && (
-                <>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> 1 seul site physique d'exploitation</p>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> Max 3 comptes Opérateurs de guichet</p>
-                </>
-              )}
-              {selectedPlan === "Standard" && (
-                <>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> Jusqu'à 3 sites physiques interconnectés</p>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> Suivi de fret automatisé avec alertes SMS</p>
-                </>
-              )}
-              {selectedPlan === "Premium" && (
-                <>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> **Nombre de sites illimité** partout en RDC</p>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> Authentification de sécurité par **OTP** Colis</p>
-                  <p className="flex items-center gap-1.5"><CheckCircle size={10} className="text-primary"/> Consolidation financière multi-sites automatisée</p>
-                </>
-              )}
-            </div>
-
             <Button type="submit" className="w-full bg-primary text-black font-semibold text-xs h-10 cursor-pointer">
-              Valider l'adhésion et ouvrir la session
+              <UserPlus size={14} className="mr-1"/> Déployer mon infrastructure
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* FOOTER */}
-      <footer className="text-center text-xs text-zinc-600 py-4 border-t border-zinc-900">
-        © 2026 Motoka Ecosystem · Solution SaaS pour l'excellence logistique.
+      <footer className="text-center text-xs text-zinc-600 py-2 border-t border-zinc-900">
+        © 2026 Motoka Ecosystem. Tous droits réservés.
       </footer>
     </div>
   );
