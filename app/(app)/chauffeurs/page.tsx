@@ -25,7 +25,7 @@ export default function ChauffeursPage() {
   const [search, setSearch] = useState("");
   
   // États pour le mode d'affichage et le modal de détails
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [selectedDriver, setSelectedDriver] = useState<typeof initialDrivers[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 

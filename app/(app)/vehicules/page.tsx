@@ -27,7 +27,7 @@ export default function VehiculesPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   
   // États pour la gestion de l'affichage et du modal
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [selectedVehicle, setSelectedVehicle] = useState<typeof initialVehicles[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
