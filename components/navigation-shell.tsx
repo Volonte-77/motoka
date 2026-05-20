@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Car, Package, Users, Settings, LogOut, Menu, Wallet, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Car, Package, Users, Settings, LogOut, Menu, Wallet, ShieldAlert, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Définition des liens de navigation principaux
@@ -14,6 +14,8 @@ const navigationItems = [
   { name: "Courses", href: "/courses", icon: Car },
   { name: "Colis", href: "/colis", icon: Package },
   { name: "Caisse", href: "/caisse", icon: Wallet }, // Ajouté pour la finance agence
+  { name: "Rapports", href: "/rapports", icon: BarChart3 },   // Ajouté pour l'analyse financière
+  { name: "Utilisateurs", href: "/utilisateurs", icon: Users },
   { name: "Super Admin", href: "/super-admin", icon: ShieldAlert }, //
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
