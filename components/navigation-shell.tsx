@@ -21,13 +21,13 @@ export default function NavigationShell({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
-      
-      {/* 1. SIDEBAR (DESKTOP & TABLETTE) */}
-      <aside className={cn(
-        "fixed top-0 left-0 z-40 h-screen bg-[#121214] border-r border-zinc-800 transition-transform md:translate-x-0 hidden md:flex flex-col justify-between",
-        sidebarOpen ? "w-64" : "w-20"
-      )}>
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white transition-colors duration-200">
+    
+    {/* 1. SIDEBAR */}
+    <aside className={cn(
+      "fixed top-0 left-0 z-40 h-screen bg-white dark:bg-[#121214] border-r border-zinc-200 dark:border-zinc-800 transition-transform md:translate-x-0 hidden md:flex flex-col justify-between",
+      sidebarOpen ? "w-64" : "w-20"
+    )}>
         {/* Header Sidebar */}
         <div className="p-4 flex items-center justify-between border-b border-zinc-800">
           <span className={cn("font-bold tracking-wider text-xl", !sidebarOpen && "hidden")}>
