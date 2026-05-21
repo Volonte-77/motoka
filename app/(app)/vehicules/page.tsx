@@ -31,43 +31,62 @@ const initialVehicles = [
   { id: "VEH-004", model: "Suzuki Alto", plate: "T220-GMA", type: "Taxi", status: "Hors service", owner: "Chauffeur Partenaire", mileage: "210,000 km", lastService: "10/01/2026", agencyId: "AGE-001" },
 ];
 
+/**
+ * Page Véhicules — MOTOKA Admin Agence
+ * ✓ Multi-Agences: Filtrage automatique par user.agencyId
+ * ✓ SuperAdmin: Peut voir tous les véhicules de toutes les agences
+ * ✓ Offline-First: Persistance localforage
+ */
 export default function VehiculesPage() {
   const { user } = useAuthStore();
+  const tenantContext = useTenantContext();
   
   // États de données réelles
-  const [vehicles, setVehicles] = useState<typeof initialVehicles>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  
   // États pour la gestion de l'affichage et des modaux
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedVehicle, setSelectedVehicle] = useState<typeof initialVehicles[0] | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // États du formulaire d'enrôlement de véhicule
   const [newModel, setNewModel] = useState("");
   const [newPlate, setNewPlate] = useState("");
-  const [newType, setNewType] = useState("Taxi");
+  const [newType, setNewType] = useState<"Bus" | "Taxi" | "Camion" | "Moto" | "Autre">("Taxi");
   const [newMileage, setNewMileage] = useState("");
-  const [isPartnerOwner, setIsPartnerOwner] = useState(false); // Gère si le véhicule est propre au chauffeur adhérent
+  const [isPartnerOwner, setIsPartnerOwner] = useState(false);
   const [ownerName, setOwnerName] = useState("");
 
-  // Charger le parc automobile depuis localforage filtré par l'agence de l'admin
+  // Charger le parc automobile depuis localforage filtré par tenant
   const loadVehiclesData = async () => {
-    let allVehicles = await localforage.getItem<typeof initialVehicles>(STORAGE_KEYS.VEHICLES_LIST) || [];
-    
-    if (allVehicles.length === 0 && user?.agencyId) {
-      const demoVehicles = initialVehicles.map(v => ({
-        ...v,
-        agencyId: user.agencyId
-      }));
-      let allVehicles = demoVehicles;
-      await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, allVehicles);
-    }
+    try {
+      setLoading(true);
+      let allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
+      
+      // Initialiser avec démo si vide
+      if (allVehicles.length === 0 && tenantContext?.agencyId) {
+        const demoVehicles = initialVehicles.map(v => ({
+          ...v,
+          agencyId: tenantContext.agencyId
+        }));
+        await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, demoVehicles);
+        allVehicles = demoVehicles;
+      }
 
-    const agencyVehicles = allVehicles.filter(v => v.agencyId === user?.agencyId);
-    setVehicles(agencyVehicles);
+      // Filtrer par tenant: SuperAdmin voit tous, autres agences voient les leurs
+      const filteredVehicles = tenantContext?.viewAll 
+        ? allVehicles 
+        : allVehicles.filter(v => v.agencyId === tenantContext?.agencyId);
+        
+      setVehicles(filteredVehicles);
+    } catch (error) {
+      console.error("Erreur chargement véhicules:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

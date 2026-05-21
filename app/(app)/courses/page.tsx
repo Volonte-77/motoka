@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import localforage from "localforage";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useTenantContext } from "@/hooks/useAuthGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,15 @@ import {
   Plus, Search, Car, Users, Milestone, Calendar, MapPin, 
   LayoutGrid, List, Eye, Clock, CheckCircle2, Play, AlertCircle, Package
 } from "lucide-react";
+import { Trip, Vehicle, STORAGE_KEYS } from "@/types";
 
-// Clés de stockage partagées
-const STORAGE_KEYS = {
-  TRIPS_LIST: "volenium_trips_list",
-  VEHICLES_LIST: "volenium_vehicles_list"
-};
+/**
+ * Page Courses / Trajets — MOTOKA Admin Agence
+ * ✓ Multi-Agences: Filtrage automatique par user.agencyId
+ * ✓ Véhicules: Charge depuis la même agence pour affectation
+ * ✓ Offline-First: Persistance localforage
+ * ✓ Synergie: Les courses assignent uniquement les véhicules de l'agence
+ */
 
 // Données fictives initiales de secours
 const initialTrips = [
@@ -29,16 +33,18 @@ const initialTrips = [
 
 export default function CoursesPage() {
   const { user } = useAuthStore();
+  const tenantContext = useTenantContext();
   
   // États de données réelles
-  const [trips, setTrips] = useState<typeof initialTrips>([]);
-  const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   
   // États de l'UI
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedTrip, setSelectedTrip] = useState<typeof initialTrips[0] | null>(null);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -53,30 +59,52 @@ export default function CoursesPage() {
   const [loadDetails, setLoadDetails] = useState("");
   const [etaEstimation, setEtaEstimation] = useState("");
 
-  // Charger les données depuis localforage
+  // Charger les données depuis localforage filtrées par tenant
   const loadData = async () => {
-    // 1. Charger les courses
-    let allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
-    if (allTrips.length === 0 && user?.agencyId) {
-      const demoTrips = initialTrips.map(t => ({ ...t, agencyId: user.agencyId }));
-      let allTrips = demoTrips;
-      await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, allTrips);
-    }
-    const agencyTrips = allTrips.filter(t => t.agencyId === user?.agencyId);
-    setTrips(agencyTrips);
+    try {
+      setLoading(true);
+      
+      // 1. Charger les courses
+      let allTrips = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
+      if (allTrips.length === 0 && tenantContext?.agencyId) {
+        const demoTrips = initialTrips.map(t => ({ ...t, agencyId: tenantContext.agencyId }));
+        await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, demoTrips);
+        allTrips = demoTrips;
+      }
 
-    // 2. Charger les véhicules disponibles pour le formulaire d'affectation
-    const allVehicles = await localforage.getItem<any[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
-    const agencyVehicles = allVehicles.filter(v => v.agencyId === user?.agencyId);
-    setAvailableVehicles(agencyVehicles);
-    if (agencyVehicles.length > 0) {
-      setSelectedVehicleId(agencyVehicles[0].id);
+      // Filtrer par tenant
+      const filteredTrips = tenantContext?.viewAll
+        ? allTrips
+        : allTrips.filter(t => t.agencyId === tenantContext?.agencyId);
+      setTrips(filteredTrips);
+
+      // 2. Charger les véhicules disponibles (même agence uniquement)
+      const allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
+      const agencyVehicles = tenantContext?.viewAll
+        ? allVehicles
+        : allVehicles.filter(v => v.agencyId === tenantContext?.agencyId);
+      setAvailableVehicles(agencyVehicles);
+      if (agencyVehicles.length > 0) {
+        setSelectedVehicleId(agencyVehicles[0].id);
+      }
+    } catch (error) {
+      console.error("Erreur chargement courses:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user, tenantContext]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <p className="text-sm text-zinc-400">Chargement des courses...</p>
+      </div>
+    );
+  }
 
   // Filtrage combiné (Axe, chauffeur ou véhicule)
   const filteredTrips = trips.filter(t => {
@@ -87,14 +115,14 @@ export default function CoursesPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const openDetails = (trip: typeof initialTrips[0]) => {
+  const openDetails = (trip: Trip) => {
     setSelectedTrip(trip);
     setIsModalOpen(true);
   };
 
   // Mises à jour de statut asynchrones persistées
   const handleUpdateStatus = async (id: string, nextStatus: string, updatedEta?: string) => {
-    const allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
+    const allTrips = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
     const updatedTrips = allTrips.map(t => {
       if (t.id === id) {
         return { 
