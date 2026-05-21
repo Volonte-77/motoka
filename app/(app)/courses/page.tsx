@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import localforage from "localforage";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,18 +11,28 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Plus, Search, Car, Users, Milestone, Calendar, MapPin, 
-  LayoutGrid, List, Eye, Clock, CheckCircle2, Play, AlertCircle
+  LayoutGrid, List, Eye, Clock, CheckCircle2, Play, AlertCircle, Package
 } from "lucide-react";
 
-// Données fictives enrichies pour les courses
+// Clés de stockage partagées
+const STORAGE_KEYS = {
+  TRIPS_LIST: "volenium_trips_list",
+  VEHICLES_LIST: "volenium_vehicles_list"
+};
+
+// Données fictives initiales de secours
 const initialTrips = [
-  { id: "CRS-402", route: "Goma → Butembo", driver: "Jean-Pierre Kasongo", vehicle: "Bus Coaster (C042-GMA)", status: "En cours", departureTime: "20/05/2026 à 07:30", eta: "Env. 6 heures", passengers: 18, load: "4 Colis" },
-  { id: "CRS-403", route: "Goma → Beni", driver: "Marc Mbusa", vehicle: "Toyota Probox (T108-GMA)", status: "Planifiée", departureTime: "21/05/2026 à 06:00", eta: "Env. 7 heures", passengers: 4, load: "2 Colis" },
-  { id: "CRS-401", route: "Goma → Kanyabayonga", driver: "Alain Paluku", vehicle: "Moto Kijima (M009-GMA)", status: "Terminée", departureTime: "19/05/2026 à 09:00", eta: "Arrivé à 14:15", passengers: 1, load: "1 Petit Colis" },
+  { id: "CRS-402", route: "Goma → Butembo", driver: "Jean-Pierre Kasongo", vehicle: "Bus Coaster (C042-GMA)", status: "En cours", departureTime: "20/05/2026 à 07:30", eta: "Env. 6 heures", passengers: 18, load: "4 Colis", agencyId: "AGE-001" },
+  { id: "CRS-403", route: "Goma → Beni", driver: "Marc Mbusa", vehicle: "Toyota Probox (T108-GMA)", status: "Planifiée", departureTime: "21/05/2026 à 06:00", eta: "Env. 7 heures", passengers: 4, load: "2 Colis", agencyId: "AGE-001" },
+  { id: "CRS-401", route: "Goma → Kanyabayonga", driver: "Alain Paluku", vehicle: "Moto Kijima (M009-GMA)", status: "Terminée", departureTime: "19/05/2026 à 09:00", eta: "Arrivé à 14:15", passengers: 1, load: "1 Petit Colis", agencyId: "AGE-001" },
 ];
 
 export default function CoursesPage() {
-  const [trips, setTrips] = useState(initialTrips);
+  const { user } = useAuthStore();
+  
+  // États de données réelles
+  const [trips, setTrips] = useState<typeof initialTrips>([]);
+  const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   
@@ -28,8 +40,45 @@ export default function CoursesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [selectedTrip, setSelectedTrip] = useState<typeof initialTrips[0] | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Filtrage combiné (Recherche par axe, chauffeur ou véhicule)
+  // États du formulaire de planification
+  const [routeFrom, setRouteFrom] = useState("");
+  const [routeTo, setRouteTo] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [departureDate, setDepartureDate] = useState("");
+  const [departureTimeStr, setDepartureTimeStr] = useState("");
+  const [passengersCount, setPassengersCount] = useState("0");
+  const [loadDetails, setLoadDetails] = useState("");
+  const [etaEstimation, setEtaEstimation] = useState("");
+
+  // Charger les données depuis localforage
+  const loadData = async () => {
+    // 1. Charger les courses
+    let allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
+    if (allTrips.length === 0 && user?.agencyId) {
+      const demoTrips = initialTrips.map(t => ({ ...t, agencyId: user.agencyId }));
+      let allTrips = demoTrips;
+      await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, allTrips);
+    }
+    const agencyTrips = allTrips.filter(t => t.agencyId === user?.agencyId);
+    setTrips(agencyTrips);
+
+    // 2. Charger les véhicules disponibles pour le formulaire d'affectation
+    const allVehicles = await localforage.getItem<any[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
+    const agencyVehicles = allVehicles.filter(v => v.agencyId === user?.agencyId);
+    setAvailableVehicles(agencyVehicles);
+    if (agencyVehicles.length > 0) {
+      setSelectedVehicleId(agencyVehicles[0].id);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  // Filtrage combiné (Axe, chauffeur ou véhicule)
   const filteredTrips = trips.filter(t => {
     const matchesSearch = t.route.toLowerCase().includes(search.toLowerCase()) || 
                           t.driver.toLowerCase().includes(search.toLowerCase()) ||
@@ -43,15 +92,69 @@ export default function CoursesPage() {
     setIsModalOpen(true);
   };
 
-  // Simulation de changement de statut pour le côté interactif
-  const handleStartTrip = (id: string) => {
-    setTrips(prev => prev.map(t => t.id === id ? { ...t, status: "En cours" } : t));
-    if (selectedTrip) setSelectedTrip({ ...selectedTrip, status: "En cours" });
+  // Mises à jour de statut asynchrones persistées
+  const handleUpdateStatus = async (id: string, nextStatus: string, updatedEta?: string) => {
+    const allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
+    const updatedTrips = allTrips.map(t => {
+      if (t.id === id) {
+        return { 
+          ...t, 
+          status: nextStatus, 
+          eta: updatedEta || t.eta 
+        };
+      }
+      return t;
+    });
+
+    await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, updatedTrips);
+    
+    // Mettre à jour l'état local de la feuille de route active
+    if (selectedTrip && selectedTrip.id === id) {
+      setSelectedTrip({ 
+        ...selectedTrip, 
+        status: nextStatus, 
+        eta: updatedEta || selectedTrip.eta 
+      });
+    }
+    loadData();
   };
 
-  const handleCompleteTrip = (id: string) => {
-    setTrips(prev => prev.map(t => t.id === id ? { ...t, status: "Terminée", eta: "Arrivé à l'instant" } : t));
-    if (selectedTrip) setSelectedTrip({ ...selectedTrip, status: "Terminée", eta: "Arrivé à l'instant" });
+  // Soumission de la nouvelle planification
+  const handlePlanTripSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!routeFrom || !routeTo || !driverName) return;
+
+    // Trouver le libellé complet du véhicule sélectionné
+    const targetVehicle = availableVehicles.find(v => v.id === selectedVehicleId);
+    const vehicleLabel = targetVehicle 
+      ? `${targetVehicle.model} (${targetVehicle.plate})` 
+      : "Véhicule non spécifié";
+
+    // Formatage de la date de départ
+    const formattedDate = departureDate 
+      ? `${departureDate.split("-").reverse().join("/")} à ${departureTimeStr || "00:00"}`
+      : "Date non définie";
+
+    const newTripItem = {
+      id: `CRS-${Math.floor(Math.random() * 800) + 100}`,
+      route: `${routeFrom} → ${routeTo}`,
+      driver: driverName,
+      vehicle: vehicleLabel,
+      status: "Planifiée",
+      departureTime: formattedDate,
+      eta: etaEstimation ? `Env. ${etaEstimation}` : "Non spécifié",
+      passengers: parseInt(passengersCount) || 0,
+      load: loadDetails || "Aucun colis",
+      agencyId: user?.agencyId || "AGE-001"
+    };
+
+    const allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
+    await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, [...allTrips, newTripItem]);
+
+    // Réinitialisation du formulaire
+    setRouteFrom(""); setRouteTo(""); setDriverName(""); setLoadDetails(""); setEtaEstimation(""); setPassengersCount("0");
+    setIsAddModalOpen(false);
+    loadData();
   };
 
   return (
@@ -62,12 +165,12 @@ export default function CoursesPage() {
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion des Courses</h1>
           <p className="text-sm text-zinc-400">Planification des trajets, affectation des équipages et suivi des lignes de transport.</p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
+        <Button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
           <Plus size={18} /> Planifier une course
         </Button>
       </div>
 
-      {/* Barre de contrôle : Recherche + Basculeur de vue */}
+      {/* Barre de contrôle */}
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
@@ -81,7 +184,7 @@ export default function CoursesPage() {
             />
           </div>
           
-          {/* Basculeur de vue Grid / Table */}
+          {/* Basculeur de vue */}
           <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -104,7 +207,7 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Filtres par État de la Course */}
+        {/* Filtres par État */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           <Button 
             variant={statusFilter === null ? "default" : "outline"}
@@ -223,7 +326,85 @@ export default function CoursesPage() {
         </div>
       )}
 
-      {/* MODAL : FEUILLE DE ROUTE DE LA COURSE */}
+      {/* MODAL 1 : PLANIFIER UN NOUVEAU TRAJET */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <MapPin size={18} className="text-primary"/> Planifier un trajet
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Configurez une nouvelle feuille de route pour une ligne régulière ou spéciale.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePlanTripSubmit} className="space-y-3 pt-1">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Lieu de départ</label>
+                <Input value={routeFrom} onChange={e => setRouteFrom(e.target.value)} placeholder="Ex: Goma" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+              </div>
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Destination</label>
+                <Input value={routeTo} onChange={e => setRouteTo(e.target.value)} placeholder="Ex: Beni" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-zinc-400">Nom du Chauffeur</label>
+              <Input value={driverName} onChange={e => setDriverName(e.target.value)} placeholder="Ex: Alain Paluku" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+            </div>
+
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-zinc-400">Affecter un véhicule disponible</label>
+              <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
+                {availableVehicles.length === 0 ? (
+                  <option value="">Aucun véhicule en base — Config interne</option>
+                ) : (
+                  availableVehicles.map(veh => (
+                    <option key={veh.id} value={veh.id}>
+                      {veh.model} — {veh.plate} [{veh.owner}]
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Date de départ</label>
+                <Input type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+              </div>
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Heure de départ</label>
+                <Input type="time" value={departureTimeStr} onChange={e => setDepartureTimeStr(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Nombre de passagers</label>
+                <Input type="number" value={passengersCount} onChange={e => setPassengersCount(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
+              </div>
+              <div className="space-y-0.5">
+                <label className="text-[10px] text-zinc-400">Estimation Durée (ETA)</label>
+                <Input value={etaEstimation} onChange={e => setEtaEstimation(e.target.value)} placeholder="Ex: 6 heures" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <label className="text-[10px] text-zinc-400">Détails colis / marchandises</label>
+              <Input value={loadDetails} onChange={e => setLoadDetails(e.target.value)} placeholder="Ex: 3 cartons pharmaceutiques" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)} className="border-zinc-800 text-zinc-300 h-8 text-xs cursor-pointer">Annuler</Button>
+              <Button type="submit" className="bg-primary text-black font-bold h-8 text-xs cursor-pointer">Confirmer le trajet</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 2 : FEUILLE DE ROUTE DE LA COURSE */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
           <DialogHeader>
@@ -252,11 +433,11 @@ export default function CoursesPage() {
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-zinc-500 uppercase font-medium">Passagers à bord</span>
-                <p className="text-zinc-200 font-medium">{selectedTrip?.passengers ?? selectedTrip?.passengers} Voyageurs</p>
+                <p className="text-zinc-200 font-medium">{selectedTrip?.passengers} Voyageurs</p>
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-zinc-500 uppercase font-medium">Fret / Cargo</span>
-                <p className="text-zinc-200 font-medium">{selectedTrip?.load}</p>
+                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Package size={14} className="text-zinc-500" />{selectedTrip?.load}</p>
               </div>
             </div>
 
@@ -281,10 +462,9 @@ export default function CoursesPage() {
               Fermer
             </Button>
             
-            {/* Boutons d'actions dynamiques selon le cycle de vie de la course */}
             {selectedTrip?.status === "Planifiée" && (
               <Button 
-                onClick={() => selectedTrip && handleStartTrip(selectedTrip.id)}
+                onClick={() => selectedTrip && handleUpdateStatus(selectedTrip.id, "En cours")}
                 className="bg-blue-600 text-white hover:bg-blue-700 cursor-pointer text-xs h-9 flex items-center gap-1.5"
               >
                 <Play size={14} /> Lancer la course
@@ -293,7 +473,7 @@ export default function CoursesPage() {
             
             {selectedTrip?.status === "En cours" && (
               <Button 
-                onClick={() => selectedTrip && handleCompleteTrip(selectedTrip.id)}
+                onClick={() => selectedTrip && handleUpdateStatus(selectedTrip.id, "Terminée", "Arrivé à l'instant")}
                 className="bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer text-xs h-9 flex items-center gap-1.5"
               >
                 <CheckCircle2 size={14} /> Marquer comme Arrivé
