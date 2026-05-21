@@ -51,6 +51,12 @@ export default function CaissePage() {
   const [activeReceipt, setActiveReceipt] = useState<CashTransaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
+  // Configuration de react-to-print pour ticket thermique
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+  });
+
   // Calculs financiers (filtrés par agenceId)
   const entrees = transactions.filter(t => t.type === "Entrée").reduce((acc, t) => acc + t.amount, 0);
   const sorties = transactions.filter(t => t.type === "Sortie").reduce((acc, t) => acc + t.amount, 0);
@@ -63,12 +69,6 @@ export default function CaissePage() {
       </div>
     );
   }
-
-  // Configuration de react-to-print pour ticket thermique
-  const receiptRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: receiptRef,
-  });
 
   const triggerPrintReceipt = (tx: CashTransaction) => {
     setActiveReceipt(tx);

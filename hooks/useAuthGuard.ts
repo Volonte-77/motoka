@@ -86,17 +86,23 @@ export function useMultiTenantAccess(agencyId: string | null) {
  * Hook: Obtenir le contexte tenant actuel pour filtrer les données
  * Retourne agencyId ou null selon le rôle
  */
+import { useMemo } from "react";
+
 export function useTenantContext() {
   const { user } = useAuthStore();
 
-  if (!user) return null;
+  return useMemo(() => {
+    if (!user) return null;
 
-  // SuperAdmin voit tout (agencyId = null = pas de filtre)
-  if (user.role === "Super Admin SaaS") return { agencyId: null, viewAll: true };
+    // SuperAdmin voit tout (agencyId = null = pas de filtre)
+    if (user.role === "Super Admin SaaS") {
+      return { agencyId: null, viewAll: true };
+    }
 
-  // Autres rôles : filtrer par leur agencyId
-  return {
-    agencyId: user.agencyId,
-    viewAll: false,
-  };
+    // Autres rôles : filtrer par leur agencyId
+    return {
+      agencyId: user.agencyId,
+      viewAll: false,
+    };
+  }, [user?.agencyId, user?.role]);
 }
