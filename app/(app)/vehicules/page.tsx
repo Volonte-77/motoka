@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import localforage from "localforage";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useTenantContext } from "@/hooks/useAuthGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,14 @@ import {
   Plus, Search, Car, Truck, Bike, Wrench, Navigation, 
   LayoutGrid, List, Eye, Calendar, ShieldCheck, Milestone, UserCheck
 } from "lucide-react";
+import { Vehicle, STORAGE_KEYS } from "@/types";
 
-// Clé de stockage partagée
-const STORAGE_KEYS = {
-  VEHICLES_LIST: "volenium_vehicles_list"
-};
+/**
+ * Page Véhicules — MOTOKA Admin Agence
+ * ✓ Multi-Agences: Filtrage automatique par user.agencyId
+ * ✓ SuperAdmin: Peut voir tous les véhicules de toutes les agences
+ * ✓ Offline-First: Persistance localforage
+ */
 
 // Données fictives initiales adaptées
 const initialVehicles = [
@@ -68,14 +72,22 @@ export default function VehiculesPage() {
 
   useEffect(() => {
     loadVehiclesData();
-  }, [user]);
+  }, [user, tenantContext]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <p className="text-sm text-zinc-400">Chargement du parc automobile...</p>
+      </div>
+    );
+  }
 
   // Enregistrement du nouveau véhicule en BDD
   const handleAddVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newModel || !newPlate) return;
 
-    const newVehicleItem = {
+    const newVehicleItem: Vehicle = {
       id: `VEH-${Math.floor(Math.random() * 900) + 100}`,
       model: newModel,
       plate: newPlate.toUpperCase(),
@@ -84,10 +96,10 @@ export default function VehiculesPage() {
       owner: isPartnerOwner ? `Chauffeur (${ownerName || "Partenaire"})` : "Agence Interne",
       mileage: newMileage ? `${parseInt(newMileage).toLocaleString()} km` : "0 km",
       lastService: new Date().toLocaleDateString("fr-FR"),
-      agencyId: user?.agencyId || "AGE-001"
+      agencyId: tenantContext?.agencyId || user?.agencyId || "AGE-001"
     };
 
-    const allVehicles = await localforage.getItem<typeof initialVehicles>(STORAGE_KEYS.VEHICLES_LIST) || [];
+    const allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
     await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, [...allVehicles, newVehicleItem]);
 
     // Reset du formulaire
@@ -97,10 +109,16 @@ export default function VehiculesPage() {
   };
 
   const filteredVehicles = vehicles.filter(v => {
-    const matchesSearch = v.model.toLowerCase().includes(search.toLowerCase()) || v.plate.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = v.model.toLowerCase().includes(search.toLowerCase()) || 
+                          v.plate.toLowerCase().includes(search.toLowerCase());
     const matchesType = selectedType ? v.type === selectedType : true;
     return matchesSearch && matchesType;
   });
+
+  const openDetails = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+    setIsModalOpen(true);
+  };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -110,10 +128,7 @@ export default function VehiculesPage() {
     }
   };
 
-  const openDetails = (vehicle: typeof initialVehicles[0]) => {
-    setSelectedVehicle(vehicle);
-    setIsModalOpen(true);
-  };
+
 
   return (
     <div className="space-y-6">
