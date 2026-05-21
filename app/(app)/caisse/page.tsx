@@ -1,20 +1,52 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import localforage from "localforage";
 import { useReactToPrint } from "react-to-print";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ArrowUpRight, ArrowDownLeft, Printer, Plus, Wallet, FileText, Landmark } from "lucide-react";
-import { CashTransaction } from "@/components/saas-mock";
+import { CashTransaction, STORAGE_KEYS } from "@/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useTenantContext } from "@/hooks/useAuthGuard";
 
+/**
+ * Page Caisse & Flux du Jour — MOTOKA Admin Agence
+ * ✓ Multi-Agences: Filtrage automatique par user.agencyId
+ * ✓ Offline-First: Persistance localforage
+ * ✓ Isolation tenant: Les données ne sont visibles que par l'agence propriétaire
+ */
 export default function CaissePage() {
-  const [transactions, setTransactions] = useState<CashTransaction[]>([
-    { id: "TX-1001", type: "Entrée", amount: 450, description: "Réservation 18 passagers Bus C042", category: "Billet", timestamp: "10:30" },
-    { id: "TX-1002", type: "Entrée", amount: 120, description: "Fret Colis TRK-9021 (Placide)", category: "Fret", timestamp: "11:15" },
-    { id: "TX-1003", type: "Sortie", amount: 85, description: "Achat Carburant Probox T108", category: "Carburant", timestamp: "12:00" },
-  ]);
+  const { user } = useAuthStore();
+  const tenantContext = useTenantContext();
+
+  const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Charger les transactions depuis localforage filtrées par agencyId
+  useEffect(() => {
+    const loadTransactions = async () => {
+      try {
+        setLoading(true);
+        let allTransactions = await localforage.getItem<CashTransaction[]>(STORAGE_KEYS.CASH_TRANSACTIONS) || [];
+
+        // Filtrer par agencyId pour isolation multi-tenant
+        if (!tenantContext?.viewAll && tenantContext?.agencyId) {
+          allTransactions = allTransactions.filter(t => t.agencyId === tenantContext.agencyId);
+        }
+
+        setTransactions(allTransactions);
+      } catch (error) {
+        console.error("Erreur chargement transactions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [user, tenantContext]);
 
   const [activeReceipt, setActiveReceipt] = useState<CashTransaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
