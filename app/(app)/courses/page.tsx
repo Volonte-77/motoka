@@ -67,7 +67,11 @@ export default function CoursesPage() {
       // 1. Charger les courses
       let allTrips = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
       if (allTrips.length === 0 && tenantContext?.agencyId) {
-        const demoTrips = initialTrips.map(t => ({ ...t, agencyId: tenantContext.agencyId }));
+        const demoTrips = initialTrips.map(t => ({ 
+          ...t, 
+          agencyId: tenantContext.agencyId,
+          status: t.status as any
+        })) as Trip[];
         await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, demoTrips);
         allTrips = demoTrips;
       }
@@ -126,8 +130,8 @@ export default function CoursesPage() {
     const updatedTrips = allTrips.map(t => {
       if (t.id === id) {
         return { 
-          ...t, 
-          status: nextStatus, 
+          ...t,
+          status: nextStatus as any,
           eta: updatedEta || t.eta 
         };
       }
@@ -140,7 +144,7 @@ export default function CoursesPage() {
     if (selectedTrip && selectedTrip.id === id) {
       setSelectedTrip({ 
         ...selectedTrip, 
-        status: nextStatus, 
+        status: nextStatus as any, 
         eta: updatedEta || selectedTrip.eta 
       });
     }

@@ -55,7 +55,7 @@ export default function VehiculesPage() {
   // États du formulaire d'enrôlement de véhicule
   const [newModel, setNewModel] = useState("");
   const [newPlate, setNewPlate] = useState("");
-  const [newType, setNewType] = useState<"Bus" | "Taxi" | "Camion" | "Moto" | "Autre">("Taxi");
+  const [newType, setNewType] = useState<"Bus" | "Taxi" | "Camion" | "Moto" | "Autre">("Taxi" as "Bus" | "Taxi" | "Camion" | "Moto" | "Autre");
   const [newMileage, setNewMileage] = useState("");
   const [isPartnerOwner, setIsPartnerOwner] = useState(false);
   const [ownerName, setOwnerName] = useState("");
@@ -70,8 +70,10 @@ export default function VehiculesPage() {
       if (allVehicles.length === 0 && tenantContext?.agencyId) {
         const demoVehicles = initialVehicles.map(v => ({
           ...v,
-          agencyId: tenantContext.agencyId
-        }));
+          agencyId: tenantContext.agencyId,
+          type: v.type as any,
+          status: v.status as any
+        })) as Vehicle[];
         await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, demoVehicles);
         allVehicles = demoVehicles;
       }
@@ -353,7 +355,7 @@ export default function VehiculesPage() {
             </div>
             <div className="space-y-0.5">
               <label className="text-[10px] text-zinc-400">Catégorie</label>
-              <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
+              <select value={newType} onChange={e => setNewType(e.target.value as any)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
                 <option value="Taxi">Taxi / Voiture citadine</option>
                 <option value="Bus">Bus / Coaster</option>
                 <option value="Camion">Camion logistique</option>
