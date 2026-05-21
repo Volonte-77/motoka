@@ -1,18 +1,34 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { SessionUser } from "@/types";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const login = useAuthStore((state) => state.login);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Logique de connexion Supabase à venir
-    console.log("Connexion avec :", email, password);
+
+    const userSession: SessionUser = {
+      id: `user-${Date.now()}`,
+      name: email.split("@")[0] || "Utilisateur",
+      email,
+      role: "Admin Agence",
+      agencyId: "AGE-001",
+      siteAccess: "Agence Principale",
+    };
+
+    await login(userSession);
+    router.push("/");
   };
 
   return (
