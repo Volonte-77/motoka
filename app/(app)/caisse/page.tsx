@@ -51,10 +51,18 @@ export default function CaissePage() {
   const [activeReceipt, setActiveReceipt] = useState<CashTransaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  // Calculs financiers
+  // Calculs financiers (filtrés par agenceId)
   const entrees = transactions.filter(t => t.type === "Entrée").reduce((acc, t) => acc + t.amount, 0);
   const sorties = transactions.filter(t => t.type === "Sortie").reduce((acc, t) => acc + t.amount, 0);
   const soldeDuJour = entrees - sorties;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <p className="text-sm text-zinc-400">Chargement de la caisse...</p>
+      </div>
+    );
+  }
 
   // Configuration de react-to-print pour ticket thermique
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -86,7 +94,7 @@ export default function CaissePage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-zinc-500 uppercase">Encaissements (Entrées)</p>
-              <h3 className="text-2xl font-bold text-emerald-500 mt-1">+{entrees} USD</h3>
+              <h3 className="text-2xl font-bold text-emerald-500 mt-1">+{entrees.toLocaleString()} FCFA</h3>
             </div>
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><ArrowDownLeft size={20}/></div>
           </CardContent>
@@ -96,7 +104,7 @@ export default function CaissePage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-zinc-500 uppercase">Décaissements (Sorties)</p>
-              <h3 className="text-2xl font-bold text-rose-500 mt-1">-{sorties} USD</h3>
+              <h3 className="text-2xl font-bold text-rose-500 mt-1">-{sorties.toLocaleString()} FCFA</h3>
             </div>
             <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500"><ArrowUpRight size={20}/></div>
           </CardContent>
@@ -106,7 +114,7 @@ export default function CaissePage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-zinc-500 uppercase">Solde Net Journalier</p>
-              <h3 className={`text-2xl font-bold mt-1 ${soldeDuJour >= 0 ? "text-primary" : "text-rose-500"}`}>{soldeDuJour} USD</h3>
+              <h3 className={`text-2xl font-bold mt-1 ${soldeDuJour >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{soldeDuJour.toLocaleString()} FCFA</h3>
             </div>
             <div className="p-2 rounded-lg bg-primary/10 text-primary"><Wallet size={20}/></div>
           </CardContent>
@@ -134,7 +142,7 @@ export default function CaissePage() {
                 <td className="px-4 py-3 font-medium text-xs sm:text-sm">{tx.description}</td>
                 <td className="px-4 py-3"><span className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-400">{tx.category}</span></td>
                 <td className={`px-4 py-3 font-bold ${tx.type === "Entrée" ? "text-emerald-500" : "text-rose-500"}`}>
-                  {tx.type === "Entrée" ? "+" : "-"}{tx.amount} $
+                  {tx.type === "Entrée" ? "+" : "-"}{tx.amount} FCFA
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Button onClick={() => triggerPrintReceipt(tx)} variant="outline" size="sm" className="h-8 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-pointer flex items-center gap-1 ml-auto">
@@ -145,6 +153,12 @@ export default function CaissePage() {
             ))}
           </tbody>
         </table>
+
+        {transactions.length === 0 && (
+          <div className="p-8 text-center text-sm text-zinc-500">
+            Aucune transaction pour cette agence.
+          </div>
+        )}
       </div>
 
       {/* MODAL IMPRESSION DU TICKET THERMIQUE (FORMAT STANDARD 58mm / 80mm) */}
