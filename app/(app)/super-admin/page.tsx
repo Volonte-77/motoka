@@ -4,10 +4,9 @@ import { useState, useEffect } from "react";
 import localforage from "localforage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, ShieldCheck, CreditCard, RefreshCw, AlertTriangle } from "lucide-react";
+import { Shield } from "lucide-react";
 import { Agency, defaultAgencies, SubscriptionPlan, SubscriptionStatus } from "@/components/saas-mock";
-
-const AGENCIES_STORAGE_KEY = "saas_agencies_data";
+import { STORAGE_KEYS } from "@/types";
 
 export default function SuperAdminPage() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
@@ -16,10 +15,10 @@ export default function SuperAdminPage() {
   // Charger ou Initialiser les agences dans localforage
   useEffect(() => {
     const initStorage = async () => {
-      let data = await localforage.getItem<Agency[]>(AGENCIES_STORAGE_KEY);
+      let data = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST);
       if (!data) {
         data = defaultAgencies;
-        await localforage.setItem(AGENCIES_STORAGE_KEY, defaultAgencies);
+        await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, defaultAgencies);
       }
       setAgencies(data);
       setLoading(false);

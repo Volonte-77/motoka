@@ -25,13 +25,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Seulement Admin Agence et Dispatcher peuvent accéder ici
-    const allowedRoles = ["Admin Agence", "Dispatcher / Opérateur"];
+    // Admin Agence, Dispatcher ou Super Admin peuvent accéder ici
+    const allowedRoles = ["Super Admin SaaS", "Admin Agence", "Dispatcher / Opérateur"];
     if (!allowedRoles.includes(user.role)) {
       // Rediriger vers l'espace approprié
       switch (user.role) {
         case "Super Admin SaaS":
-          router.push("/admin/saas/agencies");
+          router.push("/super-admin");
           break;
         case "Chauffeur":
           router.push("/driver/portal");

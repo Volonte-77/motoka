@@ -50,6 +50,17 @@ export const defaultAgencies: Agency[] = [
   { id: "AGE-003", name: "Virunga Voyage", email: "direction@virunga.cd", city: "Butembo", plan: "Basique", status: "Expiré", expiresAt: "2026-04-20", createdAt: "2025-10-05", branches: ["Butembo Centre"] },
 ];
 
+export const defaultSuperAdmin: SessionUser = {
+  id: "SUPER-ADMIN-001",
+  name: "Super Admin SaaS",
+  email: "superadmin@motoka.com",
+  role: "Super Admin SaaS",
+  agencyId: null,
+  siteAccess: "Global",
+};
+
+export const defaultSuperAdminPassword = "motoka123";
+
 // Clés constantes pour localforage conformes à vos exigences
 export const STORAGE_KEYS = {
   CURRENT_SESSION: "motoka_current_session",

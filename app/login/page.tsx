@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/useAuthStore";
-import { SessionUser } from "@/types";
+import { SessionUser, UserRole } from "@/types";
+import { defaultSuperAdmin, defaultSuperAdminPassword } from "@/components/saas-mock";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,18 +15,30 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("Admin Agence");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
-    const userSession: SessionUser = {
-      id: `user-${Date.now()}`,
-      name: email.split("@")[0] || "Utilisateur",
-      email,
-      role: "Admin Agence",
-      agencyId: "AGE-001",
-      siteAccess: "Agence Principale",
-    };
+    if (role === "Super Admin SaaS") {
+      if (email !== defaultSuperAdmin.email || password !== defaultSuperAdminPassword) {
+        setErrorMessage("Identifiants Super Admin invalides. Utilisez superadmin@motoka.com / motoka123.");
+        return;
+      }
+    }
+
+    const userSession: SessionUser = role === "Super Admin SaaS"
+      ? defaultSuperAdmin
+      : {
+          id: `user-${Date.now()}`,
+          name: email.split("@")[0] || "Utilisateur",
+          email,
+          role,
+          agencyId: "AGE-001",
+          siteAccess: "Agence Principale",
+        };
 
     await login(userSession);
     router.push("/");
@@ -54,6 +67,25 @@ export default function LoginPage() {
           
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-zinc-300" htmlFor="role">
+                  Se connecter en tant que
+                </label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="w-full rounded-md border border-zinc-800 bg-[#18181b] px-3 py-2 text-white focus-visible:ring-primary"
+                >
+                  <option value="Admin Agence">Admin Agence</option>
+                  <option value="Super Admin SaaS">Super Admin SaaS</option>
+                  <option value="Dispatcher / Opérateur">Dispatcher / Opérateur</option>
+                </select>
+                {role === "Super Admin SaaS" ? (
+                  <p className="text-xs text-zinc-500">Super Admin par défaut : superadmin@motoka.com</p>
+                ) : null}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-medium text-zinc-300" htmlFor="email">
                   Adresse Email
@@ -87,6 +119,12 @@ export default function LoginPage() {
                   className="bg-[#18181b] border-zinc-800 text-white focus-visible:ring-primary"
                 />
               </div>
+
+              {errorMessage ? (
+                <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-sm text-rose-500">
+                  {errorMessage}
+                </div>
+              ) : null}
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3">
