@@ -23,6 +23,7 @@ export default function LandingPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [isSeeded, setIsSeeded] = useState(false);
 
   // Inscription
   const [regAgencyName, setRegAgencyName] = useState("");
@@ -50,6 +51,8 @@ export default function LandingPage() {
         ];
         await localforage.setItem(STORAGE_KEYS.USERS_LIST, initialUsers);
       }
+
+      setIsSeeded(true);
     };
     seedDatabase();
   }, []);
@@ -57,6 +60,11 @@ export default function LandingPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+
+    if (!isSeeded) {
+      setLoginError("Initialisation en cours, veuillez réessayer dans un instant.");
+      return;
+    }
 
     const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
     const foundUser = allUsers.find(u => u.email === loginEmail && u.password === loginPassword);
@@ -179,7 +187,7 @@ export default function LandingPage() {
               <label className="text-[11px] font-medium text-zinc-400">Mot de passe</label>
               <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-900 border-zinc-800 text-xs text-white" required />
             </div>
-            <Button type="submit" className="w-full bg-primary text-black font-bold text-xs h-10 cursor-pointer">
+            <Button type="submit" disabled={!isSeeded} className="w-full bg-primary text-black font-bold text-xs h-10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
               <LogIn size={14} className="mr-1"/> Se connecter
             </Button>
           </form>
