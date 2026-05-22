@@ -30,7 +30,7 @@ export default function SuperAdminPage() {
   const togglePlan = async (id: string, newPlan: SubscriptionPlan) => {
     const updated = agencies.map(a => a.id === id ? { ...a, plan: newPlan } : a);
     setAgencies(updated);
-    await localforage.setItem(AGENCIES_STORAGE_KEY, updated);
+    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, updated);
   };
 
   // Action en direct : Modifier le statut d'accès (Bloquer / Activer l'agence)
@@ -38,7 +38,7 @@ export default function SuperAdminPage() {
     const nextStatus: SubscriptionStatus = currentStatus === "Actif" ? "Expiré" : "Actif";
     const updated = agencies.map(a => a.id === id ? { ...a, status: nextStatus } : a);
     setAgencies(updated);
-    await localforage.setItem(AGENCIES_STORAGE_KEY, updated);
+    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, updated);
   };
 
   if (loading) return <div className="text-sm p-6 text-zinc-400">Chargement du Core SaaS Engine...</div>;
