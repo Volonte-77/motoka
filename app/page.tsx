@@ -80,9 +80,8 @@ export default function LandingPage() {
       });
       setIsLoginOpen(false);
       
-      // Routeur applicatif adaptif
-      if (foundUser.role === "Super Admin SaaS") router.push("/super-admin");
-      else if (foundUser.role === "Chauffeur") router.push("/courses");
+      // Routeur applicatif adaptif : Super Admin utilise le même espace admin partagé
+      if (foundUser.role === "Chauffeur") router.push("/courses");
       else router.push("/dashboard");
     } else {
       setLoginError("Identifiants incorrects ou agence introuvable.");

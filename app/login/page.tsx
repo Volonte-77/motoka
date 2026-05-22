@@ -41,7 +41,11 @@ export default function LoginPage() {
         };
 
     await login(userSession);
-    router.push("/");
+    if (role === "Chauffeur") {
+      router.push("/courses");
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   return (

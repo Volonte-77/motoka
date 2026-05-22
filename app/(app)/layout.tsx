@@ -25,14 +25,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Admin Agence, Dispatcher ou Super Admin peuvent accéder ici
     const allowedRoles = ["Super Admin SaaS", "Admin Agence", "Dispatcher / Opérateur"];
     if (!allowedRoles.includes(user.role)) {
-      // Rediriger vers l'espace approprié
       switch (user.role) {
-        case "Super Admin SaaS":
-          router.push("/super-admin");
-          break;
         case "Chauffeur":
           router.push("/driver/portal");
           break;
