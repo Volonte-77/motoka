@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
 import { 
@@ -26,6 +26,7 @@ const navigationItems = [
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // Consommer l'état global Zustand sans ré-affichage inutile
@@ -104,7 +105,10 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         {/* Footer Sidebar (Déconnexion connectée au Store) */}
         <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
           <button
-            onClick={() => logout()}
+            onClick={async () => {
+              await logout();
+              router.push("/");
+            }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
           >
             <LogOut size={18} />
