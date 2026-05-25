@@ -172,8 +172,8 @@ export default function LandingPage() {
           <Button onClick={() => setIsRegisterOpen(true)} className="bg-primary text-white font-bold h-14 px-10 text-sm rounded-2xl flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/30">
             Démarrer gratuitement <ArrowRight size={16}/>
           </Button>
-          <Button onClick={() => setIsLoginOpen(true)} variant="outline" className="border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm font-bold h-14 px-10 text-sm rounded-2xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all">
-            Consulter la démo
+          <Button onClick={() => setIsLoginOpen(true)} variant="outline" className="border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm font-bold h-14 px-10 text-sm rounded-2xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-2">
+            <LogIn size={16} /> Se connecter
           </Button>
         </div>
 
