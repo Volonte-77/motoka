@@ -89,11 +89,11 @@ const FinancialReportDoc = ({ agencyName, site, data }: any) => (
 const chartConfig = {
   revenu: {
     label: "Revenu",
-    color: "hsl(var(--primary))",
+    color: "#10b981", // Vert
   },
   depenses: {
     label: "Dépenses",
-    color: "#f43f5e",
+    color: "#f43f5e", // Rose/Rouge doux
   },
 } satisfies ChartConfig;
 

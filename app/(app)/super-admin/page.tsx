@@ -18,6 +18,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import localforage from "localforage";
 import { STORAGE_KEYS, Agency, AppUser } from "@/types";
+import { cn } from "@/lib/utils";
 
 import { 
   Bar, 
@@ -48,15 +49,21 @@ const growthData = [
 const growthConfig = {
   agencies: {
     label: "Nouvelles Agences",
-    color: "hsl(var(--primary))",
+    color: "#10b981", // Vert Émeraude
   },
 } satisfies ChartConfig;
 
 const planData = [
-  { name: "Premium", value: 45, color: "hsl(var(--primary))" },
-  { name: "Standard", value: 35, color: "#3b82f6" },
-  { name: "Basique", value: 20, color: "#94a3b8" },
+  { name: "Premium", value: 45, color: "#10b981" }, // Émeraude
+  { name: "Standard", value: 35, color: "#0ea5e9" }, // Bleu Ciel
+  { name: "Basique", value: 20, color: "#f59e0b" },  // Ambre
 ];
+
+const planConfig = {
+  Premium: { label: "Premium", color: "#10b981" },
+  Standard: { label: "Standard", color: "#0ea5e9" },
+  Basique: { label: "Basique", color: "#f59e0b" },
+} satisfies ChartConfig;
 
 export default function SuperAdminDashboard() {
   const { user } = useAuthStore();
@@ -196,26 +203,24 @@ export default function SuperAdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={planData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {planData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartContainer config={planConfig} className="min-h-[200px] w-full">
+              <PieChart>
+                <Pie
+                  data={planData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {planData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              </PieChart>
+            </ChartContainer>
             <div className="mt-4 space-y-2">
               {planData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between text-xs">
@@ -230,8 +235,13 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center gap-3 text-xs text-zinc-500">
+          <Server size={14} />
+          <span>Base de données : 2.4 GB / 10 GB</span>
+        </div>
+      </div>
     </div>
   );
 }
-
-import { cn } from "@/lib/utils";

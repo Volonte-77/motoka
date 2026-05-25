@@ -42,7 +42,7 @@ const revenueData = [
 const chartConfig = {
   amount: {
     label: "Recettes",
-    color: "hsl(var(--primary))",
+    color: "#0ea5e9", // Bleu Ciel vibrant
   },
 } satisfies ChartConfig;
 
