@@ -1,149 +1,245 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, User, Shield, Mail, Phone, MoreVertical, Edit, Trash2, Key } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Shield, UserCheck, Zap, Building, CheckCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { toast } from "sonner";
+import { AppUser, UserRole } from "@/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import localforage from "localforage";
+import { STORAGE_KEYS } from "@/types";
 
-// Liste fictive d'utilisateurs de l'agence
-const initialUsers = [
-  { id: "U-882", name: "Ephraïm Kambale", role: "Admin Agence", site: "Goma - Siège", status: "Actif" },
-  { id: "U-109", name: "Sifa Muhindo", role: "Dispatcher / Opérateur", site: "Beni Antenne", status: "Actif" },
-  { id: "U-304", name: "Jean-Pierre Kasongo", role: "Chauffeur", site: "Goma Centre", status: "En course" },
-  { id: "U-012", name: "Patient Mwamba", role: "Client (Pro)", site: "Transit Fret", status: "Actif" },
-];
+const userSchema = z.object({
+  name: z.string().min(3, "Le nom est requis"),
+  email: z.string().email("Email invalide"),
+  role: z.enum(["Admin Agence", "Dispatcher", "Chauffeur", "Comptable"]),
+  phone: z.string().optional(),
+});
 
-export default function UsersAndPlansPage() {
-  const [users] = useState(initialUsers);
-  const [currentPlan, setCurrentPlan] = useState<"Basique" | "Standard" | "Premium">("Standard");
+type UserFormValues = z.infer<typeof userSchema>;
+
+export default function UtilisateursPage() {
+  const { user: currentUser } = useAuthStore();
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const form = useForm<UserFormValues>({
+    resolver: zodResolver(userSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      role: "Dispatcher",
+      phone: "",
+    },
+  });
+
+  const loadUsers = async () => {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const data = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+    // Filtrer par agence
+    const agencyUsers = data.filter(u => u.agencyId === currentUser?.agencyId);
+    setUsers(agencyUsers);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, [currentUser?.agencyId]);
+
+  const onSubmit = async (values: UserFormValues) => {
+    try {
+      const newUser: AppUser = {
+        id: Math.random().toString(36).substr(2, 9),
+        agencyId: currentUser?.agencyId || "default",
+        siteAccess: "Agence",
+        ...values,
+      } as AppUser;
+
+      const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+      await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...currentUsers, newUser]);
+      
+      await loadUsers();
+      setIsDialogOpen(false);
+      form.reset();
+      toast.success(`L'utilisateur ${values.name} a été créé`);
+    } catch (error) {
+      toast.error("Erreur lors de la création de l'utilisateur");
+    }
+  };
+
+  const getRoleBadge = (role: UserRole) => {
+    switch (role) {
+      case "Admin Agence": return <Badge className="bg-primary/10 text-primary border-primary/20">Admin Agence</Badge>;
+      case "Dispatcher": return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Guichetier</Badge>;
+      case "Comptable": return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Comptable</Badge>;
+      case "Chauffeur": return <Badge className="bg-zinc-500/10 text-zinc-500 border-zinc-500/20">Chauffeur</Badge>;
+      default: return <Badge variant="outline">{role}</Badge>;
+    }
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="space-y-8">
-      {/* SECTION 1 : GESTION DES ABONNEMENTS ET DES AVANTAGES */}
-      <div>
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Abonnement & Licence Agence</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Suivi des quotas multi-sites et mise à niveau de l'infrastructure SaaS.</p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Gestion d'Équipe</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez les utilisateurs et les accès de votre agence.</p>
         </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* Offre Basique */}
-          <Card className={`border ${currentPlan === "Basique" ? "border-primary bg-primary/5" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]"}`}>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Basique</h3>
-                  <p className="text-2xl font-black mt-1 text-zinc-900 dark:text-white">50 $ <span className="text-xs font-normal text-zinc-500">/ mois</span></p>
-                </div>
-                {currentPlan === "Basique" && <Badge className="bg-primary text-primary-foreground">Actif</Badge>}
-              </div>
-              <ul className="text-xs text-zinc-500 dark:text-zinc-400 space-y-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> 1 Seul Site Localisé</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Max 3 Opérateurs guichet</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Suivi Fret de base</li>
-              </ul>
-              {currentPlan !== "Basique" && <Button disabled variant="outline" className="w-full text-xs h-8">Sous-classer</Button>}
-            </CardContent>
-          </Card>
-
-          {/* Offre Standard */}
-          <Card className={`border ${currentPlan === "Standard" ? "border-primary bg-primary/5" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]"}`}>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Standard</h3>
-                  <p className="text-2xl font-black mt-1 text-zinc-900 dark:text-white">120 $ <span className="text-xs font-normal text-zinc-500">/ mois</span></p>
-                </div>
-                {currentPlan === "Standard" && <Badge className="bg-primary text-primary-foreground">Actif</Badge>}
-              </div>
-              <ul className="text-xs text-zinc-500 dark:text-zinc-400 space-y-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Jusqu'à 3 Sites (Goma, Beni...)</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Max 10 Opérateurs système</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Suivi Colis avec alertes SMS</li>
-              </ul>
-              {currentPlan !== "Standard" && <Button onClick={() => setCurrentPlan("Standard")} variant="outline" className="w-full text-xs h-8">Choisir Standard</Button>}
-            </CardContent>
-          </Card>
-
-          {/* Offre Premium */}
-          <Card className={`border ${currentPlan === "Premium" ? "border-primary bg-primary/5" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]"}`}>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white flex items-center gap-1.5">Plan Premium <Zap size={14} className="text-amber-500 fill-amber-500"/></h3>
-                  <p className="text-2xl font-black mt-1 text-zinc-900 dark:text-white">250 $ <span className="text-xs font-normal text-zinc-500">/ mois</span></p>
-                </div>
-                {currentPlan === "Premium" && <Badge className="bg-primary text-primary-foreground">Actif</Badge>}
-              </div>
-              <ul className="text-xs text-zinc-500 dark:text-zinc-400 space-y-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Sites & Agences **Illimités**</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Opérateurs & Chauffeurs Illimités</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Authentification complète **OTP** Colis</li>
-                <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-primary"/> Rapports consolidés avancés + PDF</li>
-              </ul>
-              {currentPlan !== "Premium" && (
-                <Button onClick={() => setCurrentPlan("Premium")} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs h-8 cursor-pointer">
-                  Passer au Plan Premium
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+          <Plus className="mr-2 h-4 w-4" /> Ajouter un collaborateur
+        </Button>
       </div>
 
-      {/* SECTION 2 : GESTION DES UTILISATEURS DU SYSTEME (RBAC) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Comptes Utilisateurs & Équipage</h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Affectation des rôles métiers sécurisés sur la plateforme.</p>
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <Input
+              placeholder="Rechercher par nom ou email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+            />
           </div>
-          <Button className="bg-primary text-primary-foreground font-medium flex items-center gap-2 cursor-pointer text-xs h-9">
-            <Plus size={14} /> Ajouter un utilisateur
-          </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-          <table className="w-full text-sm text-left text-zinc-500 dark:text-zinc-400">
-            <thead className="text-xs uppercase bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500">
-              <tr>
-                <th className="px-4 py-3">ID / Utilisateur</th>
-                <th className="px-4 py-3">Rôle Métier</th>
-                <th className="px-4 py-3">Site / Affectation</th>
-                <th className="px-4 py-3">Statut</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-zinc-900 dark:text-zinc-100">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 text-xs sm:text-sm">
-                  <td className="px-4 py-3 font-medium">
-                    <div className="flex flex-col">
-                      <span>{user.name}</span>
-                      <span className="text-[10px] font-mono text-zinc-400">{user.id}</span>
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Utilisateur</TableHead>
+              <TableHead>Rôle</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="h-32 text-center text-zinc-500">
+                  Aucun membre d'équipe trouvé.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsers.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium dark:text-zinc-200">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
+                        <User size={14} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span>{u.name}</span>
+                        <span className="text-[10px] text-zinc-500 font-mono">{u.email}</span>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs">
-                      <Shield size={12} className="text-primary"/> {user.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 flex items-center gap-1 mt-1.5">
-                    <Building size={13}/> {user.site}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                      user.status === "Actif" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                    }`}>
-                      {user.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  </TableCell>
+                  <TableCell>{getRoleBadge(u.role)}</TableCell>
+                  <TableCell className="text-zinc-500 text-xs">
+                    {u.phone || "N/A"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4 text-zinc-500" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle>Ajouter un membre</DialogTitle>
+            <DialogDescription>Créez un compte pour un nouveau collaborateur.</DialogDescription>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Nom Complet</FormLabel><FormControl><Input placeholder="Jean Dupont" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>Adresse Email</FormLabel><FormControl><Input placeholder="jean@agence.com" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="role" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rôle / Accès</FormLabel>
+                    <FormControl>
+                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
+                        <option value="Dispatcher">Guichetier (Dispatcher)</option>
+                        <option value="Admin Agence">Administrateur d'Agence</option>
+                        <option value="Comptable">Comptable</option>
+                        <option value="Chauffeur">Chauffeur</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="phone" render={({ field }) => (
+                  <FormItem><FormLabel>Téléphone</FormLabel><FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white">Créer le compte</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

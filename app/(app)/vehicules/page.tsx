@@ -387,15 +387,3 @@ export default function VehiculesPage() {
     </div>
   );
 }
-
-                <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
-                  {editingVehicle ? "Enregistrer les modifications" : "Ajouter le véhicule"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
