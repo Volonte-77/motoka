@@ -31,6 +31,8 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    
+    console.log("Tentative de connexion:", { email, role });
 
     // Validation basique pour le Super Admin (simulation)
     if (role === "Super Admin SaaS") {
