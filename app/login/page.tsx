@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { SessionUser, UserRole } from "@/types";
 import { defaultSuperAdmin, defaultSuperAdminPassword } from "@/components/saas-mock";
 import { Combobox } from "@/components/ui/combobox";
+import { getHomeRouteByRole } from "@/lib/routing-middleware";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,15 +21,18 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const roleOptions = [
-    { value: "Admin Agence", label: "Admin Agence" },
-    { value: "Super Admin SaaS", label: "Super Admin SaaS" },
-    { value: "Dispatcher / Opérateur", label: "Dispatcher / Opérateur" },
+    { value: "Admin Agence", label: "Administrateur d'Agence" },
+    { value: "Super Admin SaaS", label: "Super Administrateur SaaS" },
+    { value: "Dispatcher / Opérateur", label: "Dispatcher / Guichetier" },
+    { value: "Chauffeur", label: "Chauffeur / Conducteur" },
+    { value: "Client", label: "Client Agence" },
   ];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
+    // Validation basique pour le Super Admin (simulation)
     if (role === "Super Admin SaaS") {
       if (email !== defaultSuperAdmin.email || password !== defaultSuperAdminPassword) {
         setErrorMessage("Identifiants Super Admin invalides. Utilisez superadmin@motoka.com / motoka123.");
@@ -44,15 +48,14 @@ export default function LoginPage() {
           email,
           role,
           agencyId: "AGE-001",
-          siteAccess: "Agence Principale",
+          siteAccess: role === "Chauffeur" ? "Véhicule" : "Agence Principale",
         };
 
     await login(userSession);
-    if (role === "Chauffeur") {
-      router.push("/courses");
-    } else {
-      router.push("/dashboard");
-    }
+    
+    // Redirection intelligente basée sur le rôle
+    const homeRoute = getHomeRouteByRole(role);
+    router.push(homeRoute);
   };
 
   return (
