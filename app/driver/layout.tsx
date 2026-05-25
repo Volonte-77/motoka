@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { Logo } from "@/components/logo";
 
 /**
  * Layout pour le Portail Chauffeur (/driver/*)
@@ -80,9 +81,8 @@ export default function DriverLayout({
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
       {/* Entête minimaliste - Ultra contraste pour route */}
       <header className="bg-black border-b-2 border-orange-500 sticky top-0 z-50 px-4 py-3 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-white">MOTOKA Driver</h1>
-          <p className="text-xs text-orange-400">{user?.name}</p>
+        <div className="flex items-center gap-3">
+          <Logo size={32} />
         </div>
 
         {/* Menu mobile */}

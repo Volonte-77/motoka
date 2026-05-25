@@ -10,6 +10,7 @@ import { SessionUser, UserRole } from "@/types";
 import { defaultSuperAdmin, defaultSuperAdminPassword, backupSuperAdmin, backupSuperAdminPassword } from "@/components/saas-mock";
 import { Combobox } from "@/components/ui/combobox";
 import { getHomeRouteByRole } from "@/lib/routing-middleware";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,7 +69,9 @@ export default function LoginPage() {
     };
 
     await login(userSession);
-    router.push(getHomeRouteByRole(role));
+
+    const homeRoute = getHomeRouteByRole(userSession.role);
+    router.push(homeRoute);
   };
 
   return (
@@ -76,14 +79,11 @@ export default function LoginPage() {
       <div className="w-full max-w-[400px] space-y-6">
         {/* Logo / Entête de l'application */}
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="text-2xl font-bold tracking-wider text-zinc-900 dark:text-white">
-            MO<span className="text-primary">TO</span>KA
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
-            Gestion de transport intelligente
-          </p>
-        </div>
-
+              <Logo size={48} />
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mt-2">
+                Gestion de transport intelligente
+              </p>
+            </div>
         <Card className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] shadow-sm">
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl font-semibold text-zinc-900 dark:text-white">Connexion</CardTitle>

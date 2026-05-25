@@ -10,6 +10,7 @@ import {
   LogOut, Menu, Wallet, ShieldAlert, BarChart3, User,
   Building2, CreditCard, Activity
 } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 // Liste de navigation enrichie avec les restrictions de rôles (RBAC)
 const navigationItems = [
@@ -64,16 +65,29 @@ export default function NavigationShell({ children }: { children: React.ReactNod
       )}>
         <div>
           {/* Header Sidebar */}
-          <div className="p-4 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 h-16">
-            <span className={cn("font-bold tracking-wider text-base transition-opacity duration-150", !sidebarOpen && "hidden opacity-0")}>
-              MO<span className="text-primary">TO</span>KA <span className="text-[10px] font-mono text-zinc-500">SaaS</span>
-            </span>
-            <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer ml-auto"
+          <div className={cn(
+            "p-4 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 h-16 transition-all duration-200",
+            !sidebarOpen && "justify-center"
+          )}>
+            <div 
+              onClick={() => !sidebarOpen && setSidebarOpen(true)}
+              className={cn("transition-all duration-200", !sidebarOpen && "cursor-pointer hover:scale-110 active:scale-95")}
             >
-              <Menu size={18} />
-            </button>
+              <Logo 
+                size={sidebarOpen ? 30 : 36} 
+                showText={sidebarOpen} 
+                className={cn("transition-all duration-200", !sidebarOpen && "ml-0")} 
+              />
+            </div>
+            
+            {sidebarOpen && (
+              <button 
+                onClick={() => setSidebarOpen(false)}
+                className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer ml-auto"
+              >
+                <Menu size={18} />
+              </button>
+            )}
           </div>
 
           {/* Mini-Profil Connecté Intégré dans l'UI Supabase */}
