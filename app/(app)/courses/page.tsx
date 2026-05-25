@@ -1,517 +1,304 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import localforage from "localforage";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock } from "lucide-react";
+import { mockApi } from "@/lib/mock-api";
+import { Trip, TripStatus, Vehicle, AppUser } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useTenantContext } from "@/hooks/useAuthGuard";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Plus, Search, Car, Users, Milestone, Calendar, MapPin, 
-  LayoutGrid, List, Eye, Clock, CheckCircle2, Play, AlertCircle, Package
-} from "lucide-react";
-import { Trip, Vehicle, STORAGE_KEYS } from "@/types";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-/**
- * Page Courses / Trajets — MOTOKA Admin Agence
- * ✓ Multi-Agences: Filtrage automatique par user.agencyId
- * ✓ Véhicules: Charge depuis la même agence pour affectation
- * ✓ Offline-First: Persistance localforage
- * ✓ Synergie: Les courses assignent uniquement les véhicules de l'agence
- */
+const tripSchema = z.object({
+  route: z.string().min(5, "L'itinéraire est requis"),
+  driverId: z.string().min(1, "Veuillez sélectionner un chauffeur"),
+  vehicleId: z.string().min(1, "Veuillez sélectionner un véhicule"),
+  departureTime: z.string().min(1, "L'heure de départ est requise"),
+  eta: z.string().optional(),
+  passengers: z.preprocess((val) => Number(val), z.number().min(0)),
+  load: z.string().optional(),
+  status: z.enum(["Planifiée", "En cours", "Terminée", "Annulée"]),
+});
 
-// Données fictives initiales de secours
-const initialTrips = [
-  { id: "CRS-402", route: "Goma → Butembo", driver: "Jean-Pierre Kasongo", vehicle: "Bus Coaster (C042-GMA)", status: "En cours", departureTime: "20/05/2026 à 07:30", eta: "Env. 6 heures", passengers: 18, load: "4 Colis", agencyId: "AGE-001" },
-  { id: "CRS-403", route: "Goma → Beni", driver: "Marc Mbusa", vehicle: "Toyota Probox (T108-GMA)", status: "Planifiée", departureTime: "21/05/2026 à 06:00", eta: "Env. 7 heures", passengers: 4, load: "2 Colis", agencyId: "AGE-001" },
-  { id: "CRS-401", route: "Goma → Kanyabayonga", driver: "Alain Paluku", vehicle: "Moto Kijima (M009-GMA)", status: "Terminée", departureTime: "19/05/2026 à 09:00", eta: "Arrivé à 14:15", passengers: 1, load: "1 Petit Colis", agencyId: "AGE-001" },
-];
+type TripFormValues = z.infer<typeof tripSchema>;
 
 export default function CoursesPage() {
   const { user } = useAuthStore();
-  const tenantContext = useTenantContext();
-  
-  // États de données réelles
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  
-  // États de l'UI
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // États du formulaire de planification
-  const [routeFrom, setRouteFrom] = useState("");
-  const [routeTo, setRouteTo] = useState("");
-  const [driverName, setDriverName] = useState("");
-  const [selectedVehicleId, setSelectedVehicleId] = useState("");
-  const [departureDate, setDepartureDate] = useState("");
-  const [departureTimeStr, setDepartureTimeStr] = useState("");
-  const [passengersCount, setPassengersCount] = useState("0");
-  const [loadDetails, setLoadDetails] = useState("");
-  const [etaEstimation, setEtaEstimation] = useState("");
+  const form = useForm<TripFormValues>({
+    resolver: zodResolver(tripSchema),
+    defaultValues: {
+      route: "",
+      driverId: "",
+      vehicleId: "",
+      departureTime: new Date().toISOString().slice(0, 16),
+      eta: "Env. 4 heures",
+      passengers: 0,
+      load: "",
+      status: "Planifiée",
+    },
+  });
 
-  // Charger les données depuis localforage filtrées par tenant
   const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // 1. Charger les courses
-      let allTrips = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
-      if (allTrips.length === 0 && tenantContext?.agencyId) {
-        const demoTrips = initialTrips.map(t => ({ 
-          ...t, 
-          agencyId: tenantContext.agencyId,
-          status: t.status as any
-        })) as Trip[];
-        await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, demoTrips);
-        allTrips = demoTrips;
-      }
-
-      // Filtrer par tenant
-      const filteredTrips = tenantContext?.viewAll
-        ? allTrips
-        : allTrips.filter(t => t.agencyId === tenantContext?.agencyId);
-      setTrips(filteredTrips);
-
-      // 2. Charger les véhicules disponibles (même agence uniquement)
-      const allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
-      const agencyVehicles = tenantContext?.viewAll
-        ? allVehicles
-        : allVehicles.filter(v => v.agencyId === tenantContext?.agencyId);
-      setAvailableVehicles(agencyVehicles);
-      if (agencyVehicles.length > 0) {
-        setSelectedVehicleId(agencyVehicles[0].id);
-      }
-    } catch (error) {
-      console.error("Erreur chargement courses:", error);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const agencyId = user?.agencyId || null;
+    const [tripsData, vehiclesData, driversData] = await Promise.all([
+      mockApi.trips.getAll(agencyId),
+      mockApi.vehicles.getAll(agencyId),
+      mockApi.drivers.getAll(agencyId),
+    ]);
+    setTrips(tripsData);
+    setVehicles(vehiclesData.filter(v => v.status === "Disponible"));
+    setDrivers(driversData.filter(d => d.status === "Disponible"));
+    setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-  }, [user, tenantContext]);
+  }, [user?.agencyId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-6">
-        <p className="text-sm text-zinc-400">Chargement des courses...</p>
-      </div>
-    );
-  }
+  const onSubmit = async (values: TripFormValues) => {
+    const selectedDriver = drivers.find(d => d.id === values.driverId);
+    const selectedVehicle = vehicles.find(v => v.id === values.vehicleId);
 
-  // Filtrage combiné (Axe, chauffeur ou véhicule)
-  const filteredTrips = trips.filter(t => {
-    const matchesSearch = t.route.toLowerCase().includes(search.toLowerCase()) || 
-                          t.driver.toLowerCase().includes(search.toLowerCase()) ||
-                          t.vehicle.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter ? t.status === statusFilter : true;
-    return matchesSearch && matchesStatus;
-  });
-
-  const openDetails = (trip: Trip) => {
-    setSelectedTrip(trip);
-    setIsModalOpen(true);
-  };
-
-  // Mises à jour de statut asynchrones persistées
-  const handleUpdateStatus = async (id: string, nextStatus: string, updatedEta?: string) => {
-    const allTrips = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
-    const updatedTrips = allTrips.map(t => {
-      if (t.id === id) {
-        return { 
-          ...t,
-          status: nextStatus as any,
-          eta: updatedEta || t.eta 
-        };
-      }
-      return t;
-    });
-
-    await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, updatedTrips);
-    
-    // Mettre à jour l'état local de la feuille de route active
-    if (selectedTrip && selectedTrip.id === id) {
-      setSelectedTrip({ 
-        ...selectedTrip, 
-        status: nextStatus as any, 
-        eta: updatedEta || selectedTrip.eta 
-      });
-    }
-    loadData();
-  };
-
-  // Soumission de la nouvelle planification
-  const handlePlanTripSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!routeFrom || !routeTo || !driverName) return;
-
-    // Trouver le libellé complet du véhicule sélectionné
-    const targetVehicle = availableVehicles.find(v => v.id === selectedVehicleId);
-    const vehicleLabel = targetVehicle 
-      ? `${targetVehicle.model} (${targetVehicle.plate})` 
-      : "Véhicule non spécifié";
-
-    // Formatage de la date de départ
-    const formattedDate = departureDate 
-      ? `${departureDate.split("-").reverse().join("/")} à ${departureTimeStr || "00:00"}`
-      : "Date non définie";
-
-    const newTripItem = {
-      id: `CRS-${Math.floor(Math.random() * 800) + 100}`,
-      route: `${routeFrom} → ${routeTo}`,
-      driver: driverName,
-      vehicle: vehicleLabel,
-      status: "Planifiée",
-      departureTime: formattedDate,
-      eta: etaEstimation ? `Env. ${etaEstimation}` : "Non spécifié",
-      passengers: parseInt(passengersCount) || 0,
-      load: loadDetails || "Aucun colis",
-      agencyId: user?.agencyId || "AGE-001"
+    const tripData: Trip = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...values,
+      driver: selectedDriver?.name || "Inconnu",
+      vehicle: selectedVehicle ? `${selectedVehicle.model} (${selectedVehicle.plate})` : "Inconnu",
+      agencyId: user?.agencyId || "default-agency",
     };
 
-    const allTrips = await localforage.getItem<typeof initialTrips>(STORAGE_KEYS.TRIPS_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.TRIPS_LIST, [...allTrips, newTripItem]);
-
-    // Réinitialisation du formulaire
-    setRouteFrom(""); setRouteTo(""); setDriverName(""); setLoadDetails(""); setEtaEstimation(""); setPassengersCount("0");
-    setIsAddModalOpen(false);
-    loadData();
+    await mockApi.trips.save(tripData);
+    await loadData();
+    setIsDialogOpen(false);
+    form.reset();
   };
+
+  const getStatusBadge = (status: TripStatus) => {
+    switch (status) {
+      case "Planifiée": return <Badge variant="outline" className="border-blue-500/50 text-blue-500 bg-blue-500/5">Planifiée</Badge>;
+      case "En cours": return <Badge className="bg-amber-500 text-white">En cours</Badge>;
+      case "Terminée": return <Badge className="bg-emerald-500 text-white">Terminée</Badge>;
+      case "Annulée": return <Badge variant="destructive">Annulée</Badge>;
+      default: return <Badge>{status}</Badge>;
+    }
+  };
+
+  const filteredTrips = trips.filter(t => t.route.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion des Courses</h1>
-          <p className="text-sm text-zinc-400">Planification des trajets, affectation des équipages et suivi des lignes de transport.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Courses & Trajets</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Planifiez et suivez les voyages de vos véhicules.</p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
-          <Plus size={18} /> Planifier une course
+        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+          <Plus className="mr-2 h-4 w-4" /> Nouvelle Course
         </Button>
       </div>
 
-      {/* Barre de contrôle */}
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <Input
-              type="text"
-              placeholder="Rechercher par Axe, Chauffeur, Véhicule..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
-            />
-          </div>
-          
-          {/* Basculeur de vue */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "grid" ? "secondary" : "ghost"}
-            >
-              <LayoutGrid size={16} />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("table")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "table" ? "secondary" : "ghost"}
-            >
-              <List size={16} />
-            </Button>
+      <div className="grid gap-6 md:grid-cols-12">
+        <div className="md:col-span-8 space-y-4">
+          <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+            <CardContent className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <Input
+                  placeholder="Rechercher un itinéraire..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-zinc-50 dark:bg-zinc-900"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="border-zinc-200 dark:border-zinc-800"><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+              ))
+            ) : filteredTrips.length === 0 ? (
+              <div className="text-center py-12 text-zinc-500 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                Aucune course planifiée.
+              </div>
+            ) : (
+              filteredTrips.map((trip) => (
+                <Card key={trip.id} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] hover:border-primary/50 transition-colors group cursor-pointer">
+                  <CardContent className="p-5">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                            <MapPin size={18} />
+                          </div>
+                          <span className="font-bold text-lg dark:text-white">{trip.route}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-zinc-500">
+                          <div className="flex items-center gap-1.5"><Clock size={14} /> {trip.departureTime.replace("T", " à ")}</div>
+                          <div className="flex items-center gap-1.5"><UsersIcon size={14} /> {trip.passengers} passagers</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right hidden md:block">
+                          <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Chauffeur & Véhicule</p>
+                          <p className="text-sm font-medium dark:text-zinc-300">{trip.driver}</p>
+                          <p className="text-[10px] text-zinc-500">{trip.vehicle}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          {getStatusBadge(trip.status)}
+                          <ChevronRight size={20} className="text-zinc-300 group-hover:text-primary transition-colors" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Filtres par État */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <Button 
-            variant={statusFilter === null ? "default" : "outline"}
-            onClick={() => setStatusFilter(null)}
-            className="text-xs h-8 cursor-pointer rounded-full"
-          >
-            Toutes les courses
-          </Button>
-          {["Planifiée", "En cours", "Terminée"].map((status) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? "default" : "outline"}
-              onClick={() => setStatusFilter(status)}
-              className="text-xs h-8 cursor-pointer rounded-full"
-            >
-              {status}
-            </Button>
-          ))}
+        <div className="md:col-span-4 space-y-6">
+          <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+            <CardHeader><CardTitle className="text-sm">Aujourd'hui</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+                <span className="text-sm text-zinc-500">Total Courses</span>
+                <span className="font-bold text-xl">{trips.length}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <span className="text-sm text-emerald-600 dark:text-emerald-400">Terminées</span>
+                <span className="font-bold text-xl text-emerald-600 dark:text-emerald-400">{trips.filter(t => t.status === "Terminée").length}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* RENDU 1 : CARTES (GRID) */}
-      {viewMode === "grid" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredTrips.map((trip) => (
-            <Card 
-              key={trip.id} 
-              onClick={() => openDetails(trip)}
-              className="border-zinc-800 bg-white dark:bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
-            >
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-xs font-mono text-primary font-semibold tracking-wider">{trip.id}</span>
-                    <h3 className="text-base font-semibold text-white mt-0.5 flex items-center gap-1.5">
-                      <Milestone size={16} className="text-zinc-500" /> {trip.route}
-                    </h3>
-                  </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    trip.status === "Terminée" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                    trip.status === "En cours" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                    "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                  }`}>
-                    {trip.status}
-                  </span>
-                </div>
-
-                <div className="text-sm text-zinc-400 space-y-1.5 border-t border-zinc-800/60 pt-3">
-                  <p className="text-xs">Chauffeur : <strong className="text-zinc-200">{trip.driver}</strong></p>
-                  <p className="text-xs text-zinc-500 truncate">Véhicule : {trip.vehicle}</p>
-                </div>
-
-                <div className="text-xs text-zinc-500 flex justify-between items-center pt-1">
-                  <span className="flex items-center gap-1"><Clock size={12}/> {trip.status === "Planifiée" ? "Départ prévu" : "Durée"}</span>
-                  <span className="text-primary hover:underline flex items-center gap-1">Détails <Eye size={12}/></span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* RENDU 2 : TABLEAU */}
-      {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
-          <table className="w-full text-sm text-left text-zinc-400">
-            <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
-              <tr>
-                <th className="px-4 py-3">ID / Axe de trajet</th>
-                <th className="px-4 py-3">Chauffeur</th>
-                <th className="px-4 py-3">Véhicule</th>
-                <th className="px-4 py-3">Départ / Statut Temps</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filteredTrips.map((trip) => (
-                <tr 
-                  key={trip.id} 
-                  onClick={() => openDetails(trip)}
-                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-mono text-primary font-semibold">{trip.id}</span>
-                      <span>{trip.route}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-300">{trip.driver}</td>
-                  <td className="px-4 py-3 text-zinc-400 text-xs truncate max-w-[150px]">{trip.vehicle}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col text-xs">
-                      <span className="text-zinc-300">{trip.departureTime}</span>
-                      <span className="text-zinc-500 font-mono">{trip.eta}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                      trip.status === "Terminée" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                      trip.status === "En cours" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                      "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                    }`}>
-                      {trip.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={() => openDetails(trip)} className="text-zinc-400 hover:text-white h-7">
-                      Suivre
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* MODAL 1 : PLANIFIER UN NOUVEAU TRAJET */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <MapPin size={18} className="text-primary"/> Planifier un trajet
-            </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
-              Configurez une nouvelle feuille de route pour une ligne régulière ou spéciale.
-            </DialogDescription>
+            <DialogTitle>Planifier une nouvelle course</DialogTitle>
+            <DialogDescription>Assignez un chauffeur et un véhicule à un itinéraire.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handlePlanTripSubmit} className="space-y-3 pt-1">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Lieu de départ</label>
-                <Input value={routeFrom} onChange={e => setRouteFrom(e.target.value)} placeholder="Ex: Goma" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-              </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Destination</label>
-                <Input value={routeTo} onChange={e => setRouteTo(e.target.value)} placeholder="Ex: Beni" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-              </div>
-            </div>
 
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Nom du Chauffeur</label>
-              <Input value={driverName} onChange={e => setDriverName(e.target.value)} placeholder="Ex: Alain Paluku" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-            </div>
-
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Affecter un véhicule disponible</label>
-              <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
-                {availableVehicles.length === 0 ? (
-                  <option value="">Aucun véhicule en base — Config interne</option>
-                ) : (
-                  availableVehicles.map(veh => (
-                    <option key={veh.id} value={veh.id}>
-                      {veh.model} — {veh.plate} [{veh.owner}]
-                    </option>
-                  ))
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="route"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Itinéraire (Ex: Goma → Butembo)</FormLabel>
+                    <FormControl><Input placeholder="Ville départ → Ville arrivée" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </select>
-            </div>
+              />
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Date de départ</label>
-                <Input type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="driverId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Chauffeur</FormLabel>
+                      <FormControl>
+                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
+                          <option value="">Sélectionner...</option>
+                          {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="vehicleId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Véhicule</FormLabel>
+                      <FormControl>
+                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
+                          <option value="">Sélectionner...</option>
+                          {vehicles.map(v => <option key={v.id} value={v.id}>{v.model} ({v.plate})</option>)}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Heure de départ</label>
-                <Input type="time" value={departureTimeStr} onChange={e => setDepartureTimeStr(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Nombre de passagers</label>
-                <Input type="number" value={passengersCount} onChange={e => setPassengersCount(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="departureTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date & Heure de départ</FormLabel>
+                      <FormControl><Input type="datetime-local" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="passengers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre de passagers</FormLabel>
+                      <FormControl><Input type="number" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Estimation Durée (ETA)</label>
-                <Input value={etaEstimation} onChange={e => setEtaEstimation(e.target.value)} placeholder="Ex: 6 heures" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-              </div>
-            </div>
 
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Détails colis / marchandises</label>
-              <Input value={loadDetails} onChange={e => setLoadDetails(e.target.value)} placeholder="Ex: 3 cartons pharmaceutiques" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-            </div>
-
-            <div className="flex gap-2 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)} className="border-zinc-800 text-zinc-300 h-8 text-xs cursor-pointer">Annuler</Button>
-              <Button type="submit" className="bg-primary text-black font-bold h-8 text-xs cursor-pointer">Confirmer le trajet</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* MODAL 2 : FEUILLE DE ROUTE DE LA COURSE */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
-          <DialogHeader>
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
-              <Milestone size={14}/> Feuille de Route Opérationnelle
-            </div>
-            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
-              <span>{selectedTrip?.route}</span>
-              <span className="text-zinc-500 text-sm font-mono">({selectedTrip?.id})</span>
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs flex items-center gap-1">
-              <Calendar size={12}/> Planification : {selectedTrip?.departureTime}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Détails logistiques de la course */}
-          <div className="space-y-4 my-2 border-t border-b border-zinc-800/80 py-4 text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Chauffeur</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Users size={14} className="text-zinc-500"/>{selectedTrip?.driver}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Véhicule engagé</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Car size={14} className="text-zinc-500"/>{selectedTrip?.vehicle.split(" (")[0]}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Passagers à bord</span>
-                <p className="text-zinc-200 font-medium">{selectedTrip?.passengers} Voyageurs</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Fret / Cargo</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Package size={14} className="text-zinc-500" />{selectedTrip?.load}</p>
-              </div>
-            </div>
-
-            {/* Suivi temporel / État de la ligne */}
-            <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="text-primary" />
-                <div className="text-xs">
-                  <p className="text-zinc-200 font-medium">Indicateur de temps (ETA)</p>
-                  <p className="text-zinc-500">{selectedTrip?.eta}</p>
-                </div>
-              </div>
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/40">
-                {selectedTrip?.status}
-              </span>
-            </div>
-          </div>
-
-          {/* Actions de contrôle du flux en direct */}
-          <div className="flex gap-2 justify-end pt-1">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer text-xs h-9">
-              Fermer
-            </Button>
-            
-            {selectedTrip?.status === "Planifiée" && (
-              <Button 
-                onClick={() => selectedTrip && handleUpdateStatus(selectedTrip.id, "En cours")}
-                className="bg-blue-600 text-white hover:bg-blue-700 cursor-pointer text-xs h-9 flex items-center gap-1.5"
-              >
-                <Play size={14} /> Lancer la course
-              </Button>
-            )}
-            
-            {selectedTrip?.status === "En cours" && (
-              <Button 
-                onClick={() => selectedTrip && handleUpdateStatus(selectedTrip.id, "Terminée", "Arrivé à l'instant")}
-                className="bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer text-xs h-9 flex items-center gap-1.5"
-              >
-                <CheckCircle2 size={14} /> Marquer comme Arrivé
-              </Button>
-            )}
-          </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white">Créer la course</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,324 +1,236 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, Package as PackageIcon, User, Phone, MapPin, QrCode, ShieldCheck } from "lucide-react";
+import { mockApi } from "@/lib/mock-api";
+import { Package, PackageStatus } from "@/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Plus, Search, Package, User, ArrowRight, CheckCircle2, 
-  LayoutGrid, List, Eye, ShieldCheck, KeyRound, QrCode, Truck
-} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-// Données fictives enrichies pour les colis
-const initialPackages = [
-  { id: "TRK-9021", sender: "Anselme Kambale", receiver: "Placide Kakule", phoneReceiver: "+243 815 990 112", description: "Carton d'ordinateurs portables", route: "Goma → Butembo", status: "En transit", weight: "14 kg", value: "1,200 USD", otp: "4821" },
-  { id: "TRK-3042", sender: "Faustin Mwanawavene", receiver: "Divine Kavira", phoneReceiver: "+243 994 321 098", description: "Sac de marchandises (Habits)", route: "Goma → Beni", status: "En attente", weight: "35 kg", value: "450 000 FC", otp: "9105" },
-  { id: "TRK-1108", sender: "Rebecca Zawadi", receiver: "Michel Mwamba", phoneReceiver: "+243 823 456 781", description: "Documents administratifs scellés", route: "Goma → Kinshasa", status: "Livré", weight: "0.5 kg", value: "Non déclaré", otp: "ALREADY_VERIFIED" },
-];
+const packageSchema = z.object({
+  sender: z.string().min(3, "Expéditeur requis"),
+  receiver: z.string().min(3, "Destinataire requis"),
+  phoneReceiver: z.string().min(8, "Téléphone destinataire requis"),
+  description: z.string().min(5, "Description requise"),
+  route: z.string().min(5, "Itinéraire requis"),
+  weight: z.string().optional(),
+  value: z.string().optional(),
+  status: z.enum(["En attente", "En transit", "Livré", "Annulé"]),
+});
+
+type PackageFormValues = z.infer<typeof packageSchema>;
 
 export default function ColisPage() {
-  const [packages] = useState(initialPackages);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  
-  // États de l'UI
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedPackage, setSelectedPackage] = useState<typeof initialPackages[0] | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [otpInput, setOtpInput] = useState("");
-  const [otpError, setOtpError] = useState(false);
-  const [otpSuccess, setOtpSuccess] = useState(false);
+  const { user } = userAuthStore();
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Filtrage combiné
-  const filteredPackages = packages.filter(p => {
-    const matchesSearch = p.id.toLowerCase().includes(search.toLowerCase()) || 
-                          p.sender.toLowerCase().includes(search.toLowerCase()) || 
-                          p.receiver.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter ? p.status === statusFilter : true;
-    return matchesSearch && matchesStatus;
+  const form = useForm<PackageFormValues>({
+    resolver: zodResolver(packageSchema),
+    defaultValues: {
+      sender: "",
+      receiver: "",
+      phoneReceiver: "",
+      description: "",
+      route: "",
+      weight: "1kg",
+      value: "0 FCFA",
+      status: "En attente",
+    },
   });
 
-  const openDetails = (pkg: typeof initialPackages[0]) => {
-    setSelectedPackage(pkg);
-    setOtpInput("");
-    setOtpError(false);
-    setOtpSuccess(false);
-    setIsModalOpen(true);
+  const loadPackages = async () => {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const data = await mockApi.packages.getAll(user?.agencyId || null);
+    setPackages(data);
+    setLoading(false);
   };
 
-  const handleVerifyOtp = () => {
-    if (selectedPackage && otpInput === selectedPackage.otp) {
-      setOtpSuccess(true);
-      setOtpError(false);
-      // La logique de mise à jour Supabase viendra ici plus tard
-    } else {
-      setOtpError(true);
+  useEffect(() => {
+    loadPackages();
+  }, [user?.agencyId]);
+
+  const onSubmit = async (values: PackageFormValues) => {
+    const pkgData: Package = {
+      id: "PKG-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
+      otp: Math.floor(1000 + Math.random() * 9000).toString(),
+      agencyId: user?.agencyId || "default-agency",
+      ...values,
+    };
+
+    await mockApi.packages.save(pkgData);
+    await loadPackages();
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const getStatusBadge = (status: PackageStatus) => {
+    switch (status) {
+      case "En attente": return <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/5">En attente</Badge>;
+      case "En transit": return <Badge className="bg-blue-500 text-white">En transit</Badge>;
+      case "Livré": return <Badge className="bg-emerald-500 text-white">Livré</Badge>;
+      case "Annulé": return <Badge variant="destructive">Annulé</Badge>;
+      default: return <Badge>{status}</Badge>;
     }
   };
 
+  const filteredPackages = packages.filter(p => 
+    p.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.receiver.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion des Colis & Fret</h1>
-          <p className="text-sm text-zinc-400">Enregistrement, édition de bordereaux et sécurisation des livraisons.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Gestion des Colis</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Suivez les expéditions et livraisons de fret.</p>
         </div>
-        <Button className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
-          <Plus size={18} /> Enregistrer un colis
+        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+          <Plus className="mr-2 h-4 w-4" /> Nouvel Envoi
         </Button>
       </div>
 
-      {/* Barre de contrôle */}
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <Input
-              type="text"
-              placeholder="Rechercher par Code tracking, Expéditeur, Destinataire..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
+              placeholder="Rechercher par ID, expéditeur ou destinataire..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
             />
           </div>
-          
-          {/* Basculeur de vue Grid / Table */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "grid" ? "secondary" : "ghost"}
-            >
-              <LayoutGrid size={16} />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("table")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "table" ? "secondary" : "ghost"}
-            >
-              <List size={16} />
-            </Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="border-zinc-200 dark:border-zinc-800"><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>
+          ))
+        ) : filteredPackages.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-zinc-500 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+            Aucun colis enregistré.
           </div>
-        </div>
-
-        {/* Filtres par État du flux */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <Button 
-            variant={statusFilter === null ? "default" : "outline"}
-            onClick={() => setStatusFilter(null)}
-            className="text-xs h-8 cursor-pointer rounded-full"
-          >
-            Tous les colis
-          </Button>
-          {["En attente", "En transit", "Livré"].map((status) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? "default" : "outline"}
-              onClick={() => setStatusFilter(status)}
-              className="text-xs h-8 cursor-pointer rounded-full"
-            >
-              {status}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* RENDU 1 : CARTES (GRID) */}
-      {viewMode === "grid" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPackages.map((pkg) => (
-            <Card 
-              key={pkg.id} 
-              onClick={() => openDetails(pkg)}
-              className="border-zinc-800 bg-white dark:bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
-            >
+        ) : (
+          filteredPackages.map((pkg) => (
+            <Card key={pkg.id} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden group hover:border-primary/50 transition-colors">
+              <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
+                <span className="text-xs font-mono font-bold text-primary">{pkg.id}</span>
+                {getStatusBadge(pkg.status)}
+              </div>
               <CardContent className="p-4 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-xs font-mono text-primary tracking-wider font-semibold">{pkg.id}</span>
-                    <h3 className="text-base font-semibold text-white mt-0.5 truncate max-w-[180px]">{pkg.description}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase text-zinc-500 font-bold tracking-wider">Expéditeur</p>
+                    <p className="text-sm font-medium dark:text-zinc-200 truncate">{pkg.sender}</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    pkg.status === "Livré" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                    pkg.status === "En transit" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                    "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                  }`}>
-                    {pkg.status}
-                  </span>
-                </div>
-
-                <div className="text-sm text-zinc-400 space-y-1.5 border-t border-zinc-800/60 pt-3">
-                  <div className="flex items-center gap-2">
-                    <User size={14} className="text-zinc-500" />
-                    <span className="truncate">Pour: <strong>{pkg.receiver}</strong></span>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase text-zinc-500 font-bold tracking-wider">Destinataire</p>
+                    <p className="text-sm font-medium dark:text-zinc-200 truncate">{pkg.receiver}</p>
                   </div>
-                  <p className="text-xs text-zinc-500 font-medium bg-zinc-900 px-2 py-1 rounded w-fit">
-                    Axe : {pkg.route}
-                  </p>
                 </div>
-
-                <div className="text-xs text-zinc-500 flex justify-between items-center pt-1">
-                  <span>Poids : <strong className="text-zinc-300">{pkg.weight}</strong></span>
-                  <span className="text-primary hover:underline flex items-center gap-1">Gérer <Eye size={12}/></span>
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <MapPin size={12} /> {pkg.route}
+                </div>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck size={14} /> OTP: {pkg.otp}
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 hover:bg-primary/10 hover:text-primary">
+                    <QrCode size={12} /> Étiquette
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {/* RENDU 2 : TABLEAU */}
-      {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
-          <table className="w-full text-sm text-left text-zinc-400">
-            <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
-              <tr>
-                <th className="px-4 py-3">Code / Description</th>
-                <th className="px-4 py-3">Expéditeur</th>
-                <th className="px-4 py-3">Destinataire</th>
-                <th className="px-4 py-3">Trajet</th>
-                <th className="px-4 py-3">Poids</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filteredPackages.map((pkg) => (
-                <tr 
-                  key={pkg.id} 
-                  onClick={() => openDetails(pkg)}
-                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-mono text-primary font-semibold">{pkg.id}</span>
-                      <span>{pkg.description}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-300">{pkg.sender}</td>
-                  <td className="px-4 py-3 text-zinc-300">{pkg.receiver}</td>
-                  <td className="px-4 py-3 text-zinc-400 text-xs">{pkg.route}</td>
-                  <td className="px-4 py-3 text-zinc-300">{pkg.weight}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                      pkg.status === "Livré" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                      pkg.status === "En transit" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                      "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                    }`}>
-                      {pkg.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={() => openDetails(pkg)} className="text-zinc-400 hover:text-white h-7">
-                      Gérer
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* MODAL AVANCÉ : TRACKING & VALIDATION OTP */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
-              <Package size={14}/> Fiche de suivi fret
-            </div>
-            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
-              <span>{selectedPackage?.id}</span>
-              <span className="text-zinc-500 text-sm font-normal">| {selectedPackage?.weight}</span>
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs">
-              Contenu : {selectedPackage?.description}
-            </DialogDescription>
+            <DialogTitle>Enregistrer un nouveau colis</DialogTitle>
+            <DialogDescription>Saisissez les informations d'expédition pour générer le code de suivi.</DialogDescription>
           </DialogHeader>
 
-          {/* Flux logistique : Expéditeur → Destinataire */}
-          <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg space-y-3 my-2 text-sm">
-            <div className="flex items-center justify-between text-xs text-zinc-500 uppercase tracking-wider">
-              <span>Expéditeur</span>
-              <ArrowRight size={14} />
-              <span>Destinataire</span>
-            </div>
-            <div className="flex items-center justify-between font-medium text-zinc-200">
-              <span>{selectedPackage?.sender}</span>
-              <span className="text-primary text-xs font-mono">{selectedPackage?.route}</span>
-              <span>{selectedPackage?.receiver}</span>
-            </div>
-            <div className="text-xs text-zinc-400 text-right">
-              Tél Destinataire : {selectedPackage?.phoneReceiver}
-            </div>
-          </div>
-
-          {/* Module de Sécurisation de Livraison */}
-          <div className="border-t border-zinc-800/80 pt-4 space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-primary"/> Sécurisation de la Livraison
-            </h4>
-
-            {selectedPackage?.status === "Livré" || otpSuccess ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg flex items-center gap-2.5 text-emerald-400 text-sm">
-                <CheckCircle2 size={18} />
-                <span>Colis livré et authentifié avec succès par OTP.</span>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="sender" render={({ field }) => (
+                  <FormItem><FormLabel>Expéditeur</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="receiver" render={({ field }) => (
+                  <FormItem><FormLabel>Destinataire</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
               </div>
-            ) : selectedPackage?.status === "En transit" ? (
-              <div className="space-y-2">
-                <p className="text-xs text-zinc-400">
-                  Saisissez le code OTP à 4 chiffres envoyé par SMS au destinataire pour valider la remise en main propre :
-                </p>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                    <Input
-                      type="text"
-                      maxLength={4}
-                      placeholder="Code OTP (ex: 1234)"
-                      value={otpInput}
-                      onChange={(e) => {
-                        setOtpInput(e.target.value);
-                        setOtpError(false);
-                      }}
-                      className="pl-9 bg-zinc-900 border-zinc-800 font-mono text-center tracking-widest text-white focus-visible:ring-primary"
-                    />
-                  </div>
-                  <Button onClick={handleVerifyOtp} className="bg-primary text-primary-foreground font-medium cursor-pointer">
-                    Valider
-                  </Button>
-                </div>
-                {otpError && (
-                  <p className="text-xs text-destructive font-medium">Code OTP incorrect. Veuillez réessayer.</p>
-                )}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="phoneReceiver" render={({ field }) => (
+                  <FormItem><FormLabel>Tél. Destinataire</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="route" render={({ field }) => (
+                  <FormItem><FormLabel>Itinéraire</FormLabel><FormControl><Input placeholder="Goma → Bukavu" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
               </div>
-            ) : (
-              <div className="bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg text-amber-400 text-xs flex items-center gap-2">
-                <Truck size={16} />
-                <span>Le colis est encore au dépôt d'origine. En attente de chargement.</span>
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem><FormLabel>Description du contenu</FormLabel><FormControl><Input placeholder="Sac de farine, carton d'huile..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="weight" render={({ field }) => (
+                  <FormItem><FormLabel>Poids (Est.)</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="value" render={({ field }) => (
+                  <FormItem><FormLabel>Valeur déclarée</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
               </div>
-            )}
-          </div>
-
-          {/* Actions de pied de page */}
-          <div className="flex gap-2 justify-end pt-3 border-t border-zinc-800/40 mt-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer text-xs h-9">
-              Fermer
-            </Button>
-            <Button variant="outline" className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer text-xs h-9 flex items-center gap-1.5">
-              <QrCode size={14} /> Voir QR Code
-            </Button>
-          </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white">Générer Envoi</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+// Correction d'une faute de frappe dans l'import/usage de useAuthStore
+import { useAuthStore as userAuthStore } from "@/store/useAuthStore";

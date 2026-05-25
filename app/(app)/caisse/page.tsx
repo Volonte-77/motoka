@@ -1,211 +1,291 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import localforage from "localforage";
-import { useReactToPrint } from "react-to-print";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowUpRight, ArrowDownLeft, Printer, Plus, Wallet, FileText, Landmark } from "lucide-react";
-import { CashTransaction, STORAGE_KEYS } from "@/types";
+import React, { useState, useEffect } from "react";
+import { Plus, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownLeft, Filter, Search } from "lucide-react";
+import { mockApi } from "@/lib/mock-api";
+import { CashTransaction, CashCategory, CashTransactionType } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useTenantContext } from "@/hooks/useAuthGuard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { cn } from "@/lib/utils";
 
-/**
- * Page Caisse & Flux du Jour — MOTOKA Admin Agence
- * ✓ Multi-Agences: Filtrage automatique par user.agencyId
- * ✓ Offline-First: Persistance localforage
- * ✓ Isolation tenant: Les données ne sont visibles que par l'agence propriétaire
- */
+const transactionSchema = z.object({
+  type: z.enum(["Entrée", "Sortie"]),
+  amount: z.preprocess((val) => Number(val), z.number().min(1, "Le montant doit être supérieur à 0")),
+  description: z.string().min(5, "Description requise"),
+  category: z.enum(["Billet", "Fret", "Carburant", "Maintenance", "Autre"]),
+});
+
+type TransactionFormValues = z.infer<typeof transactionSchema>;
+
 export default function CaissePage() {
   const { user } = useAuthStore();
-  const tenantContext = useTenantContext();
-
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filterType, setFilterType] = useState<CashTransactionType | "Tous">("Tous");
 
-  // Charger les transactions depuis localforage filtrées par agencyId
-  useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        setLoading(true);
-        let allTransactions = await localforage.getItem<CashTransaction[]>(STORAGE_KEYS.CASH_TRANSACTIONS) || [];
-
-        // Filtrer par agencyId pour isolation multi-tenant
-        if (!tenantContext?.viewAll && tenantContext?.agencyId) {
-          allTransactions = allTransactions.filter(t => t.agencyId === tenantContext.agencyId);
-        }
-
-        setTransactions(allTransactions);
-      } catch (error) {
-        console.error("Erreur chargement transactions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTransactions();
-  }, [user, tenantContext]);
-
-  const [activeReceipt, setActiveReceipt] = useState<CashTransaction | null>(null);
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-
-  // Configuration de react-to-print pour ticket thermique
-  const receiptRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: receiptRef,
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      type: "Entrée",
+      amount: 0,
+      description: "",
+      category: "Billet",
+    },
   });
 
-  // Calculs financiers (filtrés par agenceId)
-  const entrees = transactions.filter(t => t.type === "Entrée").reduce((acc, t) => acc + t.amount, 0);
-  const sorties = transactions.filter(t => t.type === "Sortie").reduce((acc, t) => acc + t.amount, 0);
-  const soldeDuJour = entrees - sorties;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-6">
-        <p className="text-sm text-zinc-400">Chargement de la caisse...</p>
-      </div>
-    );
-  }
-
-  const triggerPrintReceipt = (tx: CashTransaction) => {
-    setActiveReceipt(tx);
-    setIsReceiptOpen(true);
+  const loadTransactions = async () => {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const data = await mockApi.cash.getAll(user?.agencyId || null);
+    setTransactions(data.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    setLoading(false);
   };
+
+  useEffect(() => {
+    loadTransactions();
+  }, [user?.agencyId]);
+
+  const onSubmit = async (values: TransactionFormValues) => {
+    const transaction: CashTransaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      agencyId: user?.agencyId || "default-agency",
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      ...values,
+    };
+
+    await mockApi.cash.save(transaction);
+    await loadTransactions();
+    setIsDialogOpen(false);
+    form.reset();
+  };
+
+  const totals = transactions.reduce((acc, curr) => {
+    if (curr.type === "Entrée") acc.in += curr.amount;
+    else acc.out += curr.amount;
+    return acc;
+  }, { in: 0, out: 0 });
+
+  const filteredTransactions = transactions.filter(t => filterType === "Tous" || t.type === filterType);
 
   return (
     <div className="space-y-6">
-      {/* En-tête de Caisse */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Caisse & Flux du Jour</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Suivi des encaissements billets, frets et dépenses opérationnelles.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Gestion de Caisse</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Suivi des flux financiers en temps réel.</p>
         </div>
-        <Button className="bg-primary text-primary-foreground font-medium flex items-center gap-2 cursor-pointer">
-          <Plus size={16} /> Nouvelle Opération
+        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+          <Plus className="mr-2 h-4 w-4" /> Nouvelle Opération
         </Button>
       </div>
 
-      {/* Cartes de Solde Cyber-Précises */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* Résumé des finances */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase">Encaissements (Entrées)</p>
-              <h3 className="text-2xl font-bold text-emerald-500 mt-1">+{entrees.toLocaleString()} FCFA</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><ArrowDownLeft size={20}/></div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-zinc-500">Solde Actuel</CardTitle>
+            <Wallet className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold dark:text-white">{(totals.in - totals.out).toLocaleString()} FCFA</div>
+            <p className="text-xs text-zinc-500 mt-1">Trésorerie disponible</p>
           </CardContent>
         </Card>
-
         <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase">Décaissements (Sorties)</p>
-              <h3 className="text-2xl font-bold text-rose-500 mt-1">-{sorties.toLocaleString()} FCFA</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500"><ArrowUpRight size={20}/></div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-500">Entrées (Total)</CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-500">{totals.in.toLocaleString()} FCFA</div>
+            <p className="text-xs text-zinc-500 mt-1">Cumul des revenus</p>
           </CardContent>
         </Card>
-
-        <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase">Solde Net Journalier</p>
-              <h3 className={`text-2xl font-bold mt-1 ${soldeDuJour >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{soldeDuJour.toLocaleString()} FCFA</h3>
-            </div>
-            <div className="p-2 rounded-lg bg-primary/10 text-primary"><Wallet size={20}/></div>
+        <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] sm:col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-rose-500">Sorties (Total)</CardTitle>
+            <TrendingDown className="h-4 w-4 text-rose-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-rose-500">{totals.out.toLocaleString()} FCFA</div>
+            <p className="text-xs text-zinc-500 mt-1">Cumul des dépenses</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Liste des flux */}
-      <div className="w-full overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-        <table className="w-full text-sm text-left text-zinc-500 dark:text-zinc-400">
-          <thead className="text-xs uppercase bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500">
-            <tr>
-              <th className="px-4 py-3">Réf / Heure</th>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Catégorie</th>
-              <th className="px-4 py-3">Montant</th>
-              <th className="px-4 py-3 text-right">Bordereau</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-zinc-900 dark:text-zinc-100">
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20">
-                <td className="px-4 py-3 font-mono text-xs">
-                  <span className="text-zinc-400 dark:text-zinc-500">{tx.timestamp}</span> · {tx.id}
-                </td>
-                <td className="px-4 py-3 font-medium text-xs sm:text-sm">{tx.description}</td>
-                <td className="px-4 py-3"><span className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-400">{tx.category}</span></td>
-                <td className={`px-4 py-3 font-bold ${tx.type === "Entrée" ? "text-emerald-500" : "text-rose-500"}`}>
-                  {tx.type === "Entrée" ? "+" : "-"}{tx.amount} FCFA
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Button onClick={() => triggerPrintReceipt(tx)} variant="outline" size="sm" className="h-8 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-pointer flex items-center gap-1 ml-auto">
-                    <Printer size={13}/> Reçu
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {transactions.length === 0 && (
-          <div className="p-8 text-center text-sm text-zinc-500">
-            Aucune transaction pour cette agence.
-          </div>
-        )}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
+        <Button 
+          variant={filterType === "Tous" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setFilterType("Tous")}
+          className="rounded-full text-xs h-8"
+        >
+          Toutes
+        </Button>
+        <Button 
+          variant={filterType === "Entrée" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setFilterType("Entrée")}
+          className="rounded-full text-xs h-8"
+        >
+          Entrées
+        </Button>
+        <Button 
+          variant={filterType === "Sortie" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setFilterType("Sortie")}
+          className="rounded-full text-xs h-8"
+        >
+          Sorties
+        </Button>
       </div>
 
-      {/* MODAL IMPRESSION DU TICKET THERMIQUE (FORMAT STANDARD 58mm / 80mm) */}
-      <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white max-w-sm rounded-xl">
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date & Heure</TableHead>
+              <TableHead>Description / Catégorie</TableHead>
+              <TableHead className="text-right">Montant</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredTransactions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-32 text-center text-zinc-500">
+                  Aucune transaction enregistrée.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredTransactions.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="text-xs text-zinc-500 font-mono">
+                    {new Date(t.timestamp).toLocaleString("fr-FR", { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium dark:text-zinc-200">{t.description}</p>
+                      <Badge variant="outline" className="text-[9px] h-4 uppercase border-zinc-200 dark:border-zinc-800 text-zinc-500 font-bold">
+                        {t.category}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className={cn(
+                      "flex items-center justify-end gap-1.5 font-bold",
+                      t.type === "Entrée" ? "text-emerald-500" : "text-rose-500"
+                    )}>
+                      {t.type === "Entrée" ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+                      {t.amount.toLocaleString()} <span className="text-[10px] font-medium opacity-70">FCFA</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-base text-zinc-500 dark:text-zinc-400">Aperçu du Reçu de Caisse</DialogTitle>
+            <DialogTitle>Nouvelle transaction</DialogTitle>
+            <DialogDescription>Enregistrez une entrée ou une sortie de fonds.</DialogDescription>
           </DialogHeader>
 
-          {/* ZONE IMPRIMABLE TECHNIQUE (Modélisée avec des styles natifs épurés pour l'imprimante) */}
-          <div className="p-2 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-900/40">
-            <div ref={receiptRef} className="p-4 bg-white text-black font-mono text-xs space-y-4 w-full">
-              <div className="text-center space-y-1">
-                <h2 className="text-sm font-bold tracking-tight uppercase">MOTOKA SAAS</h2>
-                <p className="text-[10px] text-zinc-600">Agence de transport & fret</p>
-                <p className="text-[9px] text-zinc-500">RDC — Nord-Kivu</p>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
+                <Button 
+                  type="button"
+                  variant={form.watch("type") === "Entrée" ? "default" : "ghost"}
+                  onClick={() => form.setValue("type", "Entrée")}
+                  className="h-9 text-xs"
+                >
+                  <TrendingUp className="mr-2 h-3 w-3" /> Entrée
+                </Button>
+                <Button 
+                  type="button"
+                  variant={form.watch("type") === "Sortie" ? "default" : "ghost"}
+                  onClick={() => form.setValue("type", "Sortie")}
+                  className="h-9 text-xs"
+                >
+                  <TrendingDown className="mr-2 h-3 w-3" /> Sortie
+                </Button>
               </div>
 
-              <div className="border-t border-b border-black border-dashed py-2 space-y-1 text-[10px]">
-                <p>REÇU N° : {activeReceipt?.id}</p>
-                <p>DATE    : {new Date().toLocaleDateString()}</p>
-                <p>HEURE   : {activeReceipt?.timestamp}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="amount" render={({ field }) => (
+                  <FormItem><FormLabel>Montant (FCFA)</FormLabel><FormControl><Input type="number" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="category" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Catégorie</FormLabel>
+                    <FormControl>
+                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
+                        <option value="Billet">Billetterie</option>
+                        <option value="Fret">Fret / Colis</option>
+                        <option value="Carburant">Carburant</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Autre">Autre</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
 
-              <div className="space-y-1 text-[11px]">
-                <p className="font-bold">DESCRIPTION :</p>
-                <p className="text-zinc-800">{activeReceipt?.description}</p>
-                <p className="text-zinc-500">Catégorie: {activeReceipt?.category}</p>
-              </div>
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem><FormLabel>Description / Motif</FormLabel><FormControl><Input placeholder="Ex: Vente billets course Goma-Bukavu" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+              )} />
 
-              <div className="border-t border-black border-dashed pt-2 flex justify-between font-bold text-sm">
-                <span>TOTAL NET :</span>
-                <span>{activeReceipt?.amount}.00 USD</span>
-              </div>
-
-              <div className="text-center pt-2 text-[9px] text-zinc-500 italic">
-                Merci pour votre confiance !
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end mt-2">
-            <Button variant="outline" onClick={() => setIsReceiptOpen(false)} className="text-xs h-9 cursor-pointer">Fermer</Button>
-            <Button onClick={() => handlePrint()} className="bg-primary text-primary-foreground text-xs h-9 font-medium flex items-center gap-1.5 cursor-pointer">
-              <Printer size={14} /> Lancer l'impression
-            </Button>
-          </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white">Valider l'opération</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

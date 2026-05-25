@@ -1,448 +1,386 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import localforage from "localforage";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, MoreHorizontal, Trash2, Edit2, Car } from "lucide-react";
+import { mockApi } from "@/lib/mock-api";
+import { Vehicle, VehicleStatus } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useTenantContext } from "@/hooks/useAuthGuard";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Plus, Search, Car, Truck, Bike, Wrench, Navigation, 
-  LayoutGrid, List, Eye, Calendar, ShieldCheck, Milestone, UserCheck
-} from "lucide-react";
-import { Vehicle, STORAGE_KEYS } from "@/types";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-/**
- * Page Véhicules — MOTOKA Admin Agence
- * ✓ Multi-Agences: Filtrage automatique par user.agencyId
- * ✓ SuperAdmin: Peut voir tous les véhicules de toutes les agences
- * ✓ Offline-First: Persistance localforage
- */
+// Schéma de validation Zod
+const vehicleSchema = z.object({
+  model: z.string().min(2, "Le modèle est requis (min 2 caractères)"),
+  plate: z.string().min(3, "La plaque d'immatriculation est requise"),
+  type: z.enum(["Bus", "Taxi", "Camion", "Moto", "Autre"]),
+  status: z.enum(["Disponible", "Mission", "Maintenance", "Hors service"]),
+  owner: z.string().min(2, "Le propriétaire est requis"),
+  mileage: z.string().min(1, "Le kilométrage est requis"),
+  lastService: z.string().min(1, "La date du dernier entretien est requise"),
+});
 
-// Données fictives initiales adaptées
-const initialVehicles = [
-  { id: "VEH-001", model: "Toyota HiAce (Coaster)", plate: "C042-GMA", type: "Bus", status: "Disponible", owner: "Agence Interne", mileage: "45,200 km", lastService: "12/04/2026", agencyId: "AGE-001" },
-  { id: "VEH-002", model: "Toyota Probox", plate: "T108-GMA", type: "Taxi", status: "Mission", owner: "Agence Interne", mileage: "128,000 km", lastService: "02/05/2026", agencyId: "AGE-001" },
-  { id: "VEH-003", model: "Fuso Fighter", plate: "C901-GMA", type: "Camion", status: "Maintenance", owner: "Agence Interne", mileage: "89,450 km", lastService: "19/05/2026", agencyId: "AGE-001" },
-  { id: "VEH-004", model: "Suzuki Alto", plate: "T220-GMA", type: "Taxi", status: "Hors service", owner: "Chauffeur Partenaire", mileage: "210,000 km", lastService: "10/01/2026", agencyId: "AGE-001" },
-];
+type VehicleFormValues = z.infer<typeof vehicleSchema>;
 
-/**
- * Page Véhicules — MOTOKA Admin Agence
- * ✓ Multi-Agences: Filtrage automatique par user.agencyId
- * ✓ SuperAdmin: Peut voir tous les véhicules de toutes les agences
- * ✓ Offline-First: Persistance localforage
- */
 export default function VehiculesPage() {
   const { user } = useAuthStore();
-  const tenantContext = useTenantContext();
-  
-  // États de données réelles
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  // États pour la gestion de l'affichage et des modaux
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // États du formulaire d'enrôlement de véhicule
-  const [newModel, setNewModel] = useState("");
-  const [newPlate, setNewPlate] = useState("");
-  const [newType, setNewType] = useState<"Bus" | "Taxi" | "Camion" | "Moto" | "Autre">("Taxi" as "Bus" | "Taxi" | "Camion" | "Moto" | "Autre");
-  const [newMileage, setNewMileage] = useState("");
-  const [isPartnerOwner, setIsPartnerOwner] = useState(false);
-  const [ownerName, setOwnerName] = useState("");
+  const form = useForm<VehicleFormValues>({
+    resolver: zodResolver(vehicleSchema),
+    defaultValues: {
+      model: "",
+      plate: "",
+      type: "Bus",
+      status: "Disponible",
+      owner: "Agence Interne",
+      mileage: "0",
+      lastService: new Date().toISOString().split("T")[0],
+    },
+  });
 
-  // Charger le parc automobile depuis localforage filtré par tenant
-  const loadVehiclesData = async () => {
-    try {
-      setLoading(true);
-      let allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
-      
-      // Initialiser avec démo si vide
-      if (allVehicles.length === 0 && tenantContext?.agencyId) {
-        const demoVehicles = initialVehicles.map(v => ({
-          ...v,
-          agencyId: tenantContext.agencyId,
-          type: v.type as any,
-          status: v.status as any
-        })) as Vehicle[];
-        await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, demoVehicles);
-        allVehicles = demoVehicles;
-      }
-
-      // Filtrer par tenant: SuperAdmin voit tous, autres agences voient les leurs
-      const filteredVehicles = tenantContext?.viewAll 
-        ? allVehicles 
-        : allVehicles.filter(v => v.agencyId === tenantContext?.agencyId);
-        
-      setVehicles(filteredVehicles);
-    } catch (error) {
-      console.error("Erreur chargement véhicules:", error);
-    } finally {
-      setLoading(false);
-    }
+  const loadVehicles = async () => {
+    setLoading(true);
+    // Simulation délai réseau
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const data = await mockApi.vehicles.getAll(user?.agencyId || null);
+    setVehicles(data);
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadVehiclesData();
-  }, [user, tenantContext]);
+    loadVehicles();
+  }, [user?.agencyId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-6">
-        <p className="text-sm text-zinc-400">Chargement du parc automobile...</p>
-      </div>
-    );
-  }
-
-  // Enregistrement du nouveau véhicule en BDD
-  const handleAddVehicleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newModel || !newPlate) return;
-
-    const newVehicleItem: Vehicle = {
-      id: `VEH-${Math.floor(Math.random() * 900) + 100}`,
-      model: newModel,
-      plate: newPlate.toUpperCase(),
-      type: newType,
-      status: "Disponible",
-      owner: isPartnerOwner ? `Chauffeur (${ownerName || "Partenaire"})` : "Agence Interne",
-      mileage: newMileage ? `${parseInt(newMileage).toLocaleString()} km` : "0 km",
-      lastService: new Date().toLocaleDateString("fr-FR"),
-      agencyId: tenantContext?.agencyId || user?.agencyId || "AGE-001"
+  const onSubmit = async (values: VehicleFormValues) => {
+    const vehicleData: Vehicle = {
+      id: editingVehicle?.id || Math.random().toString(36).substr(2, 9),
+      ...values,
+      agencyId: user?.agencyId || "default-agency",
     };
 
-    const allVehicles = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.VEHICLES_LIST, [...allVehicles, newVehicleItem]);
-
-    // Reset du formulaire
-    setNewModel(""); setNewPlate(""); setNewMileage(""); setIsPartnerOwner(false); setOwnerName("");
-    setIsAddModalOpen(false);
-    loadVehiclesData();
+    await mockApi.vehicles.save(vehicleData);
+    await loadVehicles();
+    setIsDialogOpen(false);
+    setEditingVehicle(null);
+    form.reset();
   };
 
-  const filteredVehicles = vehicles.filter(v => {
-    const matchesSearch = v.model.toLowerCase().includes(search.toLowerCase()) || 
-                          v.plate.toLowerCase().includes(search.toLowerCase());
-    const matchesType = selectedType ? v.type === selectedType : true;
-    return matchesSearch && matchesType;
-  });
-
-  const openDetails = (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle);
-    setIsModalOpen(true);
+  const handleEdit = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle);
+    form.reset({
+      model: vehicle.model,
+      plate: vehicle.plate,
+      type: vehicle.type,
+      status: vehicle.status,
+      owner: vehicle.owner,
+      mileage: vehicle.mileage,
+      lastService: vehicle.lastService,
+    });
+    setIsDialogOpen(true);
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "Camion": return <Truck size={16} />;
-      case "Moto": return <Bike size={16} />;
-      default: return <Car size={16} />;
+  const handleDelete = async (id: string) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce véhicule ?")) {
+      await mockApi.vehicles.delete(id);
+      await loadVehicles();
     }
   };
 
+  const filteredVehicles = vehicles.filter(
+    (v) =>
+      v.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.plate.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
+  const getStatusBadge = (status: VehicleStatus) => {
+    switch (status) {
+      case "Disponible":
+        return <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20">Disponible</Badge>;
+      case "Mission":
+        return <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">En mission</Badge>;
+      case "Maintenance":
+        return <Badge className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20">Maintenance</Badge>;
+      case "Hors service":
+        return <Badge className="bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border-rose-500/20">Hors service</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion du Parc Automobile</h1>
-          <p className="text-sm text-zinc-400">Suivi en temps réel des véhicules, de leur disponibilité et de leur état technique.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Véhicules</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez le parc automobile de votre agence.</p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
-          <Plus size={18} /> Ajouter un véhicule
+        <Button 
+          onClick={() => {
+            setEditingVehicle(null);
+            form.reset();
+            setIsDialogOpen(true);
+          }}
+          className="bg-primary hover:bg-primary/90 text-white"
+        >
+          <Plus className="mr-2 h-4 w-4" /> Ajouter un véhicule
         </Button>
       </div>
 
-      {/* Barre de contrôle : Recherche + Filtres + Basculeur de vue */}
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+      {/* Filtres & Recherche */}
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <Input
-              type="text"
               placeholder="Rechercher par modèle ou plaque..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
             />
           </div>
-          
-          {/* Basculeur de vue */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "grid" ? "secondary" : "ghost"}
-            >
-              <LayoutGrid size={16} />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("table")}
-              className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-              data-variant={viewMode === "table" ? "secondary" : "ghost"}
-            >
-              <List size={16} />
-            </Button>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Filtres par Catégories */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <Button 
-            variant={selectedType === null ? "default" : "outline"}
-            onClick={() => setSelectedType(null)}
-            className="text-xs h-8 cursor-pointer rounded-full"
-          >
-            Tous
-          </Button>
-          {["Bus", "Taxi", "Camion", "Moto"].map((type) => (
-            <Button
-              key={type}
-              variant={selectedType === type ? "default" : "outline"}
-              onClick={() => setSelectedType(type)}
-              className="text-xs h-8 cursor-pointer rounded-full flex items-center gap-1.5"
-            >
-              {getTypeIcon(type)}
-              {type}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* RENDU 1 : VUE EN CARTES (GRID) */}
-      {viewMode === "grid" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredVehicles.map((vehicle) => (
-            <Card 
-              key={vehicle.id} 
-              onClick={() => openDetails(vehicle)}
-              className="border-zinc-800 bg-white dark:bg-[#121214] hover:border-zinc-700 transition-colors cursor-pointer"
-            >
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-white font-semibold">
-                      <span className="text-zinc-500">{getTypeIcon(vehicle.type)}</span>
-                      <h3 className="text-base tracking-tight">{vehicle.model}</h3>
+      {/* Liste des véhicules */}
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Véhicule</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Plaque</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead className="hidden md:table-cell">Kilométrage</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredVehicles.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-zinc-500">
+                  Aucun véhicule trouvé.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredVehicles.map((vehicle) => (
+                <TableRow key={vehicle.id}>
+                  <TableCell className="font-medium dark:text-zinc-200">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-zinc-100 dark:bg-zinc-800">
+                        <Car size={16} className="text-zinc-500" />
+                      </div>
+                      {vehicle.model}
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="inline-block bg-zinc-800 text-zinc-400 font-mono text-[10px] px-2 py-0.5 rounded border border-zinc-700/50 w-fit">
-                        {vehicle.plate}
-                      </span>
-                      <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-                        Propriétaire: <span className="text-zinc-400 font-medium">{vehicle.owner}</span>
-                      </span>
+                  </TableCell>
+                  <TableCell className="text-zinc-500">{vehicle.type}</TableCell>
+                  <TableCell className="font-mono text-xs font-bold tracking-wider">{vehicle.plate}</TableCell>
+                  <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
+                  <TableCell className="hidden md:table-cell text-zinc-500">{vehicle.mileage} km</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(vehicle)} className="h-8 w-8 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                        <Edit2 className="h-4 w-4 text-zinc-500" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(vehicle.id)} className="h-8 w-8 hover:bg-rose-500/10 text-rose-500">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                    vehicle.status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                    vehicle.status === "Mission" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                    vehicle.status === "Maintenance" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                    "bg-destructive/10 text-destructive border-destructive/20"
-                  }`}>
-                    {vehicle.status}
-                  </span>
-                </div>
-                <div className="text-xs text-zinc-500 flex justify-between border-t border-zinc-800/60 pt-3">
-                  <span>Kilométrage : <strong className="text-zinc-300">{vehicle.mileage}</strong></span>
-                  <span className="text-primary hover:underline flex items-center gap-1">Voir <Eye size={12}/></span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* RENDU 2 : VUE EN TABLEAU */}
-      {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
-          <table className="w-full text-sm text-left text-zinc-400">
-            <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
-              <tr>
-                <th className="px-4 py-3">Véhicule / Plaque</th>
-                <th className="px-4 py-3">Catégorie</th>
-                <th className="px-4 py-3">Propriétaire</th>
-                <th className="px-4 py-3">Kilométrage</th>
-                <th className="px-4 py-3">Dernier Entretien</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filteredVehicles.map((vehicle) => (
-                <tr 
-                  key={vehicle.id} 
-                  onClick={() => openDetails(vehicle)}
-                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    <div className="flex flex-col">
-                      <span>{vehicle.model}</span>
-                      <span className="text-xs font-mono text-zinc-500">{vehicle.plate}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 text-zinc-300">
-                      {getTypeIcon(vehicle.type)} {vehicle.type}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-300 text-xs">{vehicle.owner}</td>
-                  <td className="px-4 py-3 text-zinc-300">{vehicle.mileage}</td>
-                  <td className="px-4 py-3 text-zinc-500">{vehicle.lastService}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                      vehicle.status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                      vehicle.status === "Mission" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                      vehicle.status === "Maintenance" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                      "bg-destructive/10 text-destructive border-destructive/20"
-                    }`}>
-                      {vehicle.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={() => openDetails(vehicle)} className="text-zinc-400 hover:text-white h-7">
-                      Détails
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* MODAL 1 : FORMULAIRE D'AJOUT ET COMPTE CONDUCTEUR PROPRE */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
+      {/* Dialog Ajout/Edition */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Car size={18} className="text-primary"/> Enregistrer un véhicule
+            <DialogTitle className="dark:text-white">
+              {editingVehicle ? "Modifier le véhicule" : "Ajouter un véhicule"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
-              Ajoutez un élément au parc automobile ou le véhicule d'un chauffeur adhérent.
+            <DialogDescription>
+              Remplissez les informations ci-dessous pour {editingVehicle ? "mettre à jour" : "enregistrer"} le véhicule.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAddVehicleSubmit} className="space-y-3 pt-2">
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Modèle du véhicule</label>
-              <Input value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="Ex: Toyota Probox 2018" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Plaque d'Immatriculation</label>
-                <Input value={newPlate} onChange={e => setNewPlate(e.target.value)} placeholder="Ex: 4819AB-19" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white font-mono" required />
-              </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Kilométrage initial (km)</label>
-                <Input type="number" value={newMileage} onChange={e => setNewMileage(e.target.value)} placeholder="Ex: 45000" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-              </div>
-            </div>
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Catégorie</label>
-              <select value={newType} onChange={e => setNewType(e.target.value as any)} className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-2 text-xs h-8 text-white focus-visible:ring-primary">
-                <option value="Taxi">Taxi / Voiture citadine</option>
-                <option value="Bus">Bus / Coaster</option>
-                <option value="Camion">Camion logistique</option>
-                <option value="Moto">Moto</option>
-              </select>
-            </div>
 
-            {/* Commutateur Adhésion Chauffeur avec son propre véhicule */}
-            <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-zinc-300 flex items-center gap-1.5">
-                  <UserCheck size={14} className="text-primary"/> Véhicule propre au chauffeur ?
-                </span>
-                <input 
-                  type="checkbox" 
-                  checked={isPartnerOwner} 
-                  onChange={e => setIsPartnerOwner(e.target.checked)}
-                  className="accent-primary h-3.5 w-3.5 cursor-pointer"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modèle</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Toyota Coaster" {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="plate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plaque</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ABC-1234" {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              {isPartnerOwner && (
-                <div className="space-y-0.5 pt-1 border-t border-zinc-800/50">
-                  <label className="text-[9px] text-zinc-400">Nom du Chauffeur propriétaire</label>
-                  <Input value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Ex: Alain Paluku" className="bg-zinc-950 border-zinc-800 text-[11px] h-7 text-white" required={isPartnerOwner} />
-                </div>
-              )}
-            </div>
 
-            <div className="flex gap-2 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)} className="border-zinc-800 text-zinc-300 h-8 text-xs cursor-pointer">Annuler</Button>
-              <Button type="submit" className="bg-primary text-black font-bold h-8 text-xs cursor-pointer">Sauvegarder</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <FormControl>
+                        <select 
+                          {...field} 
+                          className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <option value="Bus">Bus</option>
+                          <option value="Taxi">Taxi</option>
+                          <option value="Camion">Camion</option>
+                          <option value="Moto">Moto</option>
+                          <option value="Autre">Autre</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Statut</FormLabel>
+                      <FormControl>
+                        <select 
+                          {...field} 
+                          className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <option value="Disponible">Disponible</option>
+                          <option value="Mission">En mission</option>
+                          <option value="Maintenance">Maintenance</option>
+                          <option value="Hors service">Hors service</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-      {/* MODAL 2 : FICHE TECHNIQUE DU VÉHICULE */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
-          <DialogHeader>
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
-              {selectedVehicle && getTypeIcon(selectedVehicle.type)} Fiche Technique
-            </div>
-            <DialogTitle className="text-2xl font-bold tracking-tight text-white">
-              {selectedVehicle?.model}
-            </DialogTitle>
-            <DialogDescription className="font-mono text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 w-fit">
-              Immatriculation : {selectedVehicle?.plate}
-            </DialogDescription>
-          </DialogHeader>
+              <FormField
+                control={form.control}
+                name="owner"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Propriétaire</FormLabel>
+                    <FormControl>
+                      <Input {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <div className="space-y-4 my-2 border-t border-b border-zinc-800/80 py-4 text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Régime de Propriété</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><ShieldCheck size={14} className="text-zinc-500"/>{selectedVehicle?.owner}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="mileage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Kilométrage</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastService"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dernier entretien</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Kilométrage Actuel</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Milestone size={14} className="text-zinc-500"/>{selectedVehicle?.mileage}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Dernier Entretien</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5"><Calendar size={14} className="text-zinc-500"/>{selectedVehicle?.lastService}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Statut Courant</span>
-                <p className="text-primary font-semibold">{selectedVehicle?.status}</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer">
-              Fermer
-            </Button>
-            {selectedVehicle?.status === "Disponible" && (
-              <Button className="bg-primary text-primary-foreground hover:opacity-90 cursor-pointer flex items-center gap-1.5">
-                <Navigation size={14} /> Assigner à une course
-              </Button>
-            )}
-            {selectedVehicle?.status === "Maintenance" && (
-              <Button className="bg-amber-600 text-white hover:bg-amber-700 cursor-pointer flex items-center gap-1.5">
-                <Wrench size={14} /> Clôturer l'entretien
-              </Button>
-            )}
-          </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="dark:text-zinc-400">
+                  Annuler
+                </Button>
+                <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
+                  {editingVehicle ? "Enregistrer les modifications" : "Ajouter le véhicule"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

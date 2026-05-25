@@ -1,397 +1,316 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import localforage from "localforage";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, Edit2, Trash2, User, Phone, Mail, BadgeCheck } from "lucide-react";
+import { mockApi } from "@/lib/mock-api";
+import { AppUser, UserRole } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
-import { STORAGE_KEYS, AppUser } from "@/components/saas-mock";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle 
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Plus, Search, Users, Phone, Car, ShieldAlert, CheckCircle2, 
-  LayoutGrid, List, Eye, IdCard as IdentificationCard, FileText, Star
-} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-// Données de secours initiales (utilisées uniquement si la BDD locale est vide)
-const initialDrivers = [
-  { id: "DRV-001", name: "Jean-Pierre Kasongo", phone: "+243 991 234 567", vehicle: "Bus Coaster - C042", status: "Disponible", license: "Catégorie ABC", rating: "4.8", joinedDate: "14/09/2025", email: "kasongo.driver@mail.cd", agencyId: "AGE-001", siteAccess: "Global" },
-  { id: "DRV-002", name: "Marc Mbusa", phone: "+243 812 345 678", vehicle: "Toyota Probox - T108", status: "En mission", license: "Catégorie B", rating: "4.5", joinedDate: "02/11/2025", email: "mbusa@mail.cd", agencyId: "AGE-001", siteAccess: "Global" },
-  { id: "DRV-003", name: "Alain Paluku", phone: "+243 973 456 789", vehicle: "Moto Kijima - M009", status: "Hors service", license: "Catégorie A", rating: "4.9", joinedDate: "20/01/2026", email: "paluku@mail.cd", agencyId: "AGE-001", siteAccess: "Global" },
-];
+const driverSchema = z.object({
+  name: z.string().min(3, "Le nom est requis"),
+  email: z.string().email("Email invalide"),
+  phone: z.string().min(8, "Téléphone requis"),
+  license: z.string().min(5, "Numéro de permis requis"),
+  vehicleAssigned: z.string().optional(),
+  status: z.enum(["Disponible", "Mission", "Maintenance", "Hors service"]),
+});
+
+type DriverFormValues = z.infer<typeof driverSchema>;
 
 export default function ChauffeursPage() {
   const { user } = useAuthStore();
-  
-  // États de la base de données locale
   const [drivers, setDrivers] = useState<AppUser[]>([]);
-  const [search, setSearch] = useState("");
-  
-  // États pour le mode d'affichage et les modals
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [selectedDriver, setSelectedDriver] = useState<AppUser | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingDriver, setEditingDriver] = useState<AppUser | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // États du formulaire d'ajout d'un nouveau chauffeur
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newVehicle, setNewVehicle] = useState("");
-  const [newLicense, setNewLicense] = useState("Catégorie B");
+  const form = useForm<DriverFormValues>({
+    resolver: zodResolver(driverSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      license: "",
+      vehicleAssigned: "",
+      status: "Disponible",
+    },
+  });
 
-  // Charger les chauffeurs depuis localforage en filtrant par agence
-  const loadDriversData = async () => {
-    let allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-    
-    // Si aucun utilisateur n'est présent ou s'il n'y a aucun chauffeur, on injecte les données de démo rattachées à l'agence courante
-    const hasDrivers = allUsers.some(u => u.role === "Chauffeur");
-    if (!hasDrivers && user?.agencyId) {
-      const demoDrivers = initialDrivers.map(d => ({
-        ...d,
-        id: `DRV-${Math.floor(Math.random() * 900) + 100}`,
-        agencyId: user.agencyId,
-        role: "Chauffeur" as const,
-        vehicleAssigned: d.vehicle,
-      }));
-      allUsers = [...allUsers, ...demoDrivers];
-      await localforage.setItem(STORAGE_KEYS.USERS_LIST, allUsers);
-    }
-
-    // Filtrer pour n'afficher que les chauffeurs de l'agence de l'admin connecté
-    const agencyDrivers = allUsers.filter(u => u.role === "Chauffeur" && u.agencyId === user?.agencyId);
-    setDrivers(agencyDrivers);
+  const loadDrivers = async () => {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const data = await mockApi.drivers.getAll(user?.agencyId || null);
+    setDrivers(data);
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadDriversData();
-  }, [user]);
+    loadDrivers();
+  }, [user?.agencyId]);
 
-  // Logique de soumission et d'écriture en BDD
-  const handleAddDriverSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName || !newEmail || !newPassword) return;
-
-    const newDriver: AppUser = {
-      id: `DRV-${Math.floor(Math.random() * 900) + 100}`,
-      name: newName,
-      email: newEmail,
-      password: newPassword,
-      role: "Chauffeur",
-      agencyId: user?.agencyId || null,
-      siteAccess: "Global",
-      phone: newPhone || "+243 --- --- ---",
-      vehicleAssigned: newVehicle || "Aucun (En attente)"
+  const onSubmit = async (values: DriverFormValues) => {
+    const driverData: AppUser = {
+      id: editingDriver?.id || Math.random().toString(36).substr(2, 9),
+      role: "Chauffeur" as UserRole,
+      agencyId: user?.agencyId || "default-agency",
+      siteAccess: "Agence",
+      ...values,
     };
 
-    // Propriétés étendues simulées pour matcher votre structure graphique initiale
-    (newDriver as any).status = "Disponible";
-    (newDriver as any).license = newLicense;
-    (newDriver as any).rating = "5.0";
-    (newDriver as any).joinedDate = new Date().toLocaleDateString("fr-FR");
-
-    const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...allUsers, newDriver]);
-
-    // Réinitialisation de l'état du formulaire
-    setNewName(""); setNewEmail(""); setNewPassword(""); setNewPhone(""); setNewVehicle("");
-    setIsAddModalOpen(false);
-    
-    // Rafraîchissement de la vue
-    loadDriversData();
+    await mockApi.drivers.save(driverData);
+    await loadDrivers();
+    setIsDialogOpen(false);
+    setEditingDriver(null);
+    form.reset();
   };
 
-  const filteredDrivers = drivers.filter(driver => 
-    driver.name.toLowerCase().includes(search.toLowerCase()) || 
-    (driver.phone && driver.phone.includes(search))
+  const handleEdit = (driver: AppUser) => {
+    setEditingDriver(driver);
+    form.reset({
+      name: driver.name,
+      email: driver.email,
+      phone: driver.phone || "",
+      license: driver.license || "",
+      vehicleAssigned: driver.vehicleAssigned || "",
+      status: (driver.status as any) || "Disponible",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const filteredDrivers = drivers.filter(
+    (d) =>
+      d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const openDetails = (driver: AppUser) => {
-    setSelectedDriver(driver);
-    setIsModalOpen(true);
-  };
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-white">Gestion des Chauffeurs</h1>
-          <p className="text-sm text-zinc-400">Suivi, documents et statuts opérationnels des chauffeurs de l'agence.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Chauffeurs</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez les conducteurs et leurs affectations.</p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-2 w-full sm:w-auto cursor-pointer">
-          <Plus size={18} />
-          Ajouter un chauffeur
+        <Button onClick={() => { setEditingDriver(null); form.reset(); setIsDialogOpen(true); }} className="bg-primary hover:bg-primary/90 text-white">
+          <Plus className="mr-2 h-4 w-4" /> Ajouter un chauffeur
         </Button>
       </div>
 
-      {/* Barre de contrôle : Recherche + Basculeur de vue */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-          <Input
-            type="text"
-            placeholder="Rechercher par nom ou numéro de téléphone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-white dark:bg-[#121214] border-zinc-800 text-white focus-visible:ring-primary"
-          />
-        </div>
-        
-        {/* Basculeur de vue Grid / Table */}
-        <div className="flex items-center gap-1 bg-white dark:bg-[#121214] border border-zinc-800 p-1 rounded-lg self-end md:self-auto">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode("grid")}
-            className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-            data-variant={viewMode === "grid" ? "secondary" : "ghost"}
-          >
-            <LayoutGrid size={16} />
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setViewMode("table")}
-            className="h-8 w-8 cursor-pointer text-zinc-400 data-[variant=secondary]:text-white"
-            data-variant={viewMode === "table" ? "secondary" : "ghost"}
-          >
-            <List size={16} />
-          </Button>
-        </div>
-      </div>
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <Input
+              placeholder="Rechercher par nom, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* RENDU 1 : VUE EN CARTES (GRID) */}
-      {viewMode === "grid" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredDrivers.map((driver) => {
-            const status = (driver as any).status || "Disponible";
-            return (
-              <Card 
-                key={driver.id} 
-                onClick={() => openDetails(driver)}
-                className="border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden hover:border-zinc-700 transition-colors cursor-pointer"
-              >
-                <CardContent className="p-4 space-y-4">
-                  
-                  {/* Entête Carte : Nom & Statut */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-white text-base">{driver.name}</h3>
-                      <p className="text-xs text-zinc-500">ID: {driver.id}</p>
-                    </div>
-                    
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                      status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                      status === "En mission" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                      "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-                    }`}>
-                      {status}
-                    </span>
-                  </div>
-
-                  {/* Données de contact rapides */}
-                  <div className="space-y-2 text-sm text-zinc-400 border-t border-zinc-800/60 pt-3">
-                    <div className="flex items-center gap-2.5">
-                      <Phone size={14} className="text-zinc-500" />
-                      <span>{driver.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <Car size={14} className="text-zinc-500" />
-                      <span>{driver.vehicleAssigned || (driver as any).vehicle}</span>
-                    </div>
-                  </div>
-
-                  {/* Ligne inférieure de la carte */}
-                  <div className="text-xs text-zinc-500 flex justify-between items-center pt-1">
-                    <div className="flex items-center gap-1 text-amber-400">
-                      <Star size={12} fill="currentColor"/> <span>{(driver as any).rating || "5.0"}</span>
-                    </div>
-                    <span className="text-primary hover:underline flex items-center gap-1">Profil <Eye size={12}/></span>
-                  </div>
-
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* RENDU 2 : VUE EN TABLEAU */}
-      {viewMode === "table" && (
-        <div className="w-full overflow-x-auto rounded-xl border border-zinc-800 bg-white dark:bg-[#121214]">
-          <table className="w-full text-sm text-left text-zinc-400">
-            <thead className="text-xs uppercase bg-zinc-900 text-zinc-400 border-b border-zinc-800">
-              <tr>
-                <th className="px-4 py-3">Chauffeur / ID</th>
-                <th className="px-4 py-3">Téléphone</th>
-                <th className="px-4 py-3">Véhicule Assigné</th>
-                <th className="px-4 py-3">Note</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filteredDrivers.map((driver) => {
-                const status = (driver as any).status || "Disponible";
-                return (
-                  <tr 
-                    key={driver.id} 
-                    onClick={() => openDetails(driver)}
-                    className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                  >
-                    <td className="px-4 py-3 font-medium text-white">
-                      <div className="flex flex-col">
-                        <span>{driver.name}</span>
-                        <span className="text-xs text-zinc-500">{driver.id}</span>
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Chauffeur</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead className="hidden md:table-cell">Permis</TableHead>
+              <TableHead>Véhicule</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredDrivers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-zinc-500">
+                  Aucun chauffeur trouvé.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredDrivers.map((driver) => (
+                <TableRow key={driver.id}>
+                  <TableCell className="font-medium dark:text-zinc-200">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <User size={14} />
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">{driver.phone}</td>
-                    <td className="px-4 py-3 text-zinc-300">{driver.vehicleAssigned || (driver as any).vehicle}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 text-amber-400 text-xs">
-                        <Star size={12} fill="currentColor"/> {(driver as any).rating || "5.0"}
+                      <div>
+                        <p>{driver.name}</p>
+                        <p className="text-[10px] text-zinc-500 font-mono">ID: {driver.id}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        status === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                        status === "En mission" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                        "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-                      }`}>
-                        {status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" onClick={() => openDetails(driver)} className="text-zinc-400 hover:text-white h-7">
-                        Profil
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                        <Phone size={10} /> {driver.phone}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                        <Mail size={10} /> {driver.email}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center gap-1.5 text-xs font-medium dark:text-zinc-400">
+                      <BadgeCheck size={12} className="text-primary" /> {driver.license}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-500 text-xs">
+                    {driver.vehicleAssigned || "Non assigné"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={
+                      driver.status === "Disponible" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/5" :
+                      driver.status === "Mission" ? "border-blue-500/50 text-blue-500 bg-blue-500/5" :
+                      "border-zinc-500/50 text-zinc-500 bg-zinc-500/5"
+                    }>
+                      {driver.status || "Inactif"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(driver)} className="h-8 w-8">
+                        <Edit2 className="h-4 w-4 text-zinc-500" />
                       </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-rose-500/10 text-rose-500">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
-      {/* MODAL 1 : AJOUT D'UN NOUVEAU CHAUFFEUR DANS LA BDD */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-sm rounded-xl">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Users size={18} className="text-primary"/> Enrôler un nouveau conducteur
-            </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
-              Le compte sera directement rattaché à votre agence.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddDriverSubmit} className="space-y-3 pt-2">
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Nom Complet</label>
-              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ex: Patient Paluku" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Email de Connexion</label>
-                <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="chauffeur@mail.com" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-              </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Mot de passe</label>
-                <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" required />
-              </div>
-            </div>
-            <div className="space-y-0.5">
-              <label className="text-[10px] text-zinc-400">Numéro de Téléphone</label>
-              <Input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="+243..." className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Véhicule (Plaque/ID)</label>
-                <Input value={newVehicle} onChange={e => setNewVehicle(e.target.value)} placeholder="Ex: Probox - A12" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-              </div>
-              <div className="space-y-0.5">
-                <label className="text-[10px] text-zinc-400">Permis de conduire</label>
-                <Input value={newLicense} onChange={e => setNewLicense(e.target.value)} placeholder="Catégorie ABC" className="bg-zinc-900 border-zinc-800 text-xs h-8 text-white" />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)} className="border-zinc-800 text-zinc-300 h-8 text-xs cursor-pointer">Annuller</Button>
-              <Button type="submit" className="bg-primary text-black font-bold h-8 text-xs cursor-pointer">Sauvegarder</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* MODAL 2 : PROFIL DÉTAILLÉ DU CHAUFFEUR */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="bg-white dark:bg-[#121214] border border-zinc-800 text-white max-w-md rounded-xl">
-          <DialogHeader>
-            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-primary uppercase mb-1">
-              <Users size={14}/> Fiche Chauffeur
-            </div>
-            <DialogTitle className="text-2xl font-bold tracking-tight text-white">
-              {selectedDriver?.name}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
-              Inscrit le {selectedDriver?.joinedDate || "Récemment"}
-            </DialogDescription>
+            <DialogTitle>{editingDriver ? "Modifier le chauffeur" : "Ajouter un chauffeur"}</DialogTitle>
+            <DialogDescription>Informations personnelles et professionnelles du conducteur.</DialogDescription>
           </DialogHeader>
 
-          {/* Corps d'informations du profil */}
-          <div className="space-y-4 my-2 border-t border-b border-zinc-800/80 py-4 text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Contact direct</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
-                  <Phone size={14} className="text-zinc-500"/>{selectedDriver?.phone}
-                </p>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nom Complet</FormLabel>
+                    <FormControl><Input placeholder="Jean Dupont" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl><Input placeholder="jean@motoka.com" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Téléphone</FormLabel>
+                      <FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Type de Permis</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
-                  <IdentificationCard size={14} className="text-zinc-500"/>{selectedDriver?.license || "Catégorie B"}
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="license"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>N° Permis</FormLabel>
+                      <FormControl><Input placeholder="P-123456" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Statut Initial</FormLabel>
+                      <FormControl>
+                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
+                          <option value="Disponible">Disponible</option>
+                          <option value="Mission">En mission</option>
+                          <option value="Maintenance">Maintenance</option>
+                          <option value="Hors service">Hors service</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Véhicule Actuel</span>
-                <p className="text-zinc-200 font-medium flex items-center gap-1.5">
-                  <Car size={14} className="text-zinc-500"/>{selectedDriver?.vehicleAssigned || selectedDriver?.vehicle}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-zinc-500 uppercase font-medium">Note Globale</span>
-                <p className="text-amber-400 font-medium flex items-center gap-1">
-                  <Star size={14} fill="currentColor"/> {selectedDriver?.rating || "5.0"} / 5
-                </p>
-              </div>
-            </div>
-
-            {/* Statut du dossier / Documents */}
-            <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-lg flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-zinc-400" />
-                <div className="text-xs">
-                  <p className="text-zinc-200 font-medium">Vérification des documents</p>
-                  <p className="text-zinc-500">Permis & Dossier médical à jour</p>
-                </div>
-              </div>
-              <CheckCircle2 size={18} className="text-emerald-400" />
-            </div>
-          </div>
-
-          {/* Boutons d'actions */}
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-zinc-800 text-zinc-300 hover:bg-zinc-800 cursor-pointer">
-              Fermer
-            </Button>
-            <Button className="bg-primary text-primary-foreground hover:opacity-90 cursor-pointer">
-              Modifier le profil
-            </Button>
-          </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white">{editingDriver ? "Mettre à jour" : "Enregistrer"}</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
