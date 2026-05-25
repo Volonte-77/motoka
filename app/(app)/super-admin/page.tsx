@@ -19,6 +19,45 @@ import { Skeleton } from "@/components/ui/skeleton";
 import localforage from "localforage";
 import { STORAGE_KEYS, Agency, AppUser } from "@/types";
 
+import { 
+  Bar, 
+  BarChart, 
+  CartesianGrid, 
+  XAxis, 
+  Pie, 
+  PieChart, 
+  Cell, 
+  ResponsiveContainer 
+} from "recharts";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  ChartConfig
+} from "@/components/ui/chart";
+
+const growthData = [
+  { month: "Jan", agencies: 2 },
+  { month: "Féb", agencies: 5 },
+  { month: "Mar", agencies: 8 },
+  { month: "Avr", agencies: 12 },
+  { month: "Mai", agencies: 15 },
+  { month: "Juin", agencies: 22 },
+];
+
+const growthConfig = {
+  agencies: {
+    label: "Nouvelles Agences",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
+const planData = [
+  { name: "Premium", value: 45, color: "hsl(var(--primary))" },
+  { name: "Standard", value: 35, color: "#3b82f6" },
+  { name: "Basique", value: 20, color: "#94a3b8" },
+];
+
 export default function SuperAdminDashboard() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState({
@@ -124,28 +163,28 @@ export default function SuperAdminDashboard() {
         <Card className="md:col-span-8 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Globe size={16} className="text-primary" /> Croissance du Réseau (6 mois)
+              <Globe size={16} className="text-primary" /> Croissance du Réseau
             </CardTitle>
-            <CardDescription>Nombre de nouvelles agences par mois.</CardDescription>
+            <CardDescription>Évolution des nouvelles agences par mois.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[240px] flex items-end justify-around gap-4 pt-8">
-              {[2, 5, 8, 12, 15, 22].map((val, i) => (
-                <div key={i} className="flex flex-col items-center gap-2 flex-1 max-w-[60px] group">
-                  <div 
-                    className="w-full bg-primary/20 group-hover:bg-primary transition-all rounded-t-md relative" 
-                    style={{ height: `${(val / 25) * 100}%` }}
-                  >
-                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                      {val}
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-zinc-500 font-mono">
-                    {['Jan', 'Féb', 'Mar', 'Avr', 'Mai', 'Juin'][i]}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ChartContainer config={growthConfig} className="min-h-[200px] w-full">
+              <BarChart data={growthData}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                <XAxis 
+                  dataKey="month" 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickMargin={8}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar 
+                  dataKey="agencies" 
+                  fill="var(--color-agencies)" 
+                  radius={[4, 4, 0, 0]} 
+                />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -156,40 +195,37 @@ export default function SuperAdminDashboard() {
               <Zap size={16} className="text-amber-500" /> Répartition des Plans
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium">
-                <span>Premium</span>
-                <span className="text-zinc-500">45%</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-primary w-[45%]"></div>
-              </div>
+          <CardContent>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={planData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {planData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium">
-                <span>Standard</span>
-                <span className="text-zinc-500">35%</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 w-[35%]"></div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium">
-                <span>Basique</span>
-                <span className="text-zinc-500">20%</span>
-              </div>
-              <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-zinc-400 w-[20%]"></div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <Server size={14} />
-                <span>Base de données : 2.4 GB / 10 GB</span>
-              </div>
+            <div className="mt-4 space-y-2">
+              {planData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-zinc-500">{item.name}</span>
+                  </div>
+                  <span className="font-bold text-zinc-900 dark:text-white">{item.value}%</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

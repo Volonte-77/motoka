@@ -15,6 +15,37 @@ import {
   ArrowUpRight
 } from "lucide-react";
 
+import { 
+  Area, 
+  AreaChart, 
+  CartesianGrid, 
+  XAxis, 
+  ResponsiveContainer 
+} from "recharts";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  ChartConfig
+} from "@/components/ui/chart";
+
+const revenueData = [
+  { day: "Lun", amount: 45000 },
+  { day: "Mar", amount: 52000 },
+  { day: "Mer", amount: 38000 },
+  { day: "Jeu", amount: 65000 },
+  { day: "Ven", amount: 48000 },
+  { day: "Sam", amount: 72000 },
+  { day: "Dim", amount: 40000 },
+];
+
+const chartConfig = {
+  amount: {
+    label: "Recettes",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState({
@@ -64,7 +95,7 @@ export default function DashboardPage() {
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
-          <div className="text-2xl font-bold dark:text-white">{value}</div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-white">{value}</div>
         )}
         {trend && (
           <p className="text-[10px] font-medium text-emerald-500 flex items-center gap-1 mt-1">
@@ -123,19 +154,31 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px] flex items-end justify-around gap-2 pt-4">
-              {[40, 60, 45, 90, 65, 80, 50].map((h, i) => (
-                <div key={i} className="flex flex-col items-center gap-2 flex-1 max-w-[40px]">
-                  <div 
-                    className="w-full bg-primary/20 hover:bg-primary transition-colors rounded-t-sm" 
-                    style={{ height: `${h}%` }}
-                  ></div>
-                  <span className="text-[10px] text-zinc-500 font-mono">
-                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'][i]}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+              <AreaChart data={revenueData}>
+                <defs>
+                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-amount)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--color-amount)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                <XAxis 
+                  dataKey="day" 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickMargin={8}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area 
+                  type="monotone" 
+                  dataKey="amount" 
+                  stroke="var(--color-amount)" 
+                  fillOpacity={1} 
+                  fill="url(#colorAmount)" 
+                />
+              </AreaChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 

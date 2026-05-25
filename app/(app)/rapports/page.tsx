@@ -9,6 +9,24 @@ import {
   ArrowDownLeft, ArrowUpRight, ShieldCheck, RefreshCw 
 } from "lucide-react";
 
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from "recharts";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  ChartConfig
+} from "@/components/ui/chart";
+
 // 1. Définition des styles pour le Rapport PDF Professionnel Clean
 const pdfStyles = StyleSheet.create({
   page: { padding: 40, backgroundColor: "#ffffff", fontFamily: "Helvetica" },
@@ -68,6 +86,17 @@ const FinancialReportDoc = ({ agencyName, site, data }: any) => (
   </Document>
 );
 
+const chartConfig = {
+  revenu: {
+    label: "Revenu",
+    color: "hsl(var(--primary))",
+  },
+  depenses: {
+    label: "Dépenses",
+    color: "#f43f5e",
+  },
+} satisfies ChartConfig;
+
 export default function RapportsPage() {
   const [selectedSite, setSelectedSite] = useState<"Global" | "Goma Centre" | "Beni Antenne">("Global");
 
@@ -79,6 +108,12 @@ export default function RapportsPage() {
   };
 
   const activeData = stats[selectedSite];
+
+  const compareData = [
+    { name: "Global", revenu: stats.Global.revenu, depenses: stats.Global.depenses },
+    { name: "Goma", revenu: stats["Goma Centre"].revenu, depenses: stats["Goma Centre"].depenses },
+    { name: "Beni", revenu: stats["Beni Antenne"].revenu, depenses: stats["Beni Antenne"].depenses },
+  ];
 
   return (
     <div className="space-y-6">
@@ -141,28 +176,18 @@ export default function RapportsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Flux d'Activité Terrain</CardTitle>
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Comparatif Performance Sites</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-lg">
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">{activeData.passagers} Voyageurs</p>
-                <p className="text-xs text-zinc-500">Billets émis aux guichets</p>
-              </div>
-              <div className="h-2 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-primary" style={{ width: "70%" }}></div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 border border-zinc-100 dark:border-zinc-800 rounded-lg">
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">{activeData.colis} Colis enregistrés</p>
-                <p className="text-xs text-zinc-500">Fret et messagerie sécurisée</p>
-              </div>
-              <div className="h-2 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: "45%" }}></div>
-              </div>
-            </div>
+          <CardContent className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <BarChart data={compareData}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="revenu" fill="var(--color-revenu)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="depenses" fill="var(--color-depenses)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
