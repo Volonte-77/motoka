@@ -37,6 +37,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
 
 // Schéma de validation Zod
 const vehicleSchema = z.object({
@@ -375,6 +376,18 @@ export default function VehiculesPage() {
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="dark:text-zinc-400">
                   Annuler
                 </Button>
+                <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
+                  {editingVehicle ? "Enregistrer les modifications" : "Ajouter le véhicule"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
                 <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
                   {editingVehicle ? "Enregistrer les modifications" : "Ajouter le véhicule"}
                 </Button>

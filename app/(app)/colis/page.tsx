@@ -85,17 +85,25 @@ export default function ColisPage() {
   }, [user?.agencyId]);
 
   const onSubmit = async (values: PackageFormValues) => {
-    const pkgData: Package = {
-      id: "PKG-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      otp: Math.floor(1000 + Math.random() * 9000).toString(),
-      agencyId: user?.agencyId || "default-agency",
-      ...values,
-    };
+    try {
+      const pkgData: Package = {
+        id: "PKG-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
+        otp: Math.floor(1000 + Math.random() * 9000).toString(),
+        agencyId: user?.agencyId || "default-agency",
+        ...values,
+      };
 
-    await mockApi.packages.save(pkgData);
-    await loadPackages();
-    setIsDialogOpen(false);
-    form.reset();
+      await mockApi.packages.save(pkgData);
+      await loadPackages();
+      setIsDialogOpen(false);
+      form.reset();
+      toast.success(`Colis enregistré ! OTP: ${pkgData.otp}`, {
+        description: "Communiquez ce code au destinataire pour la récupération.",
+        duration: 5000,
+      });
+    } catch (error) {
+      toast.error("Erreur lors de l'enregistrement du colis");
+    }
   };
 
   const getStatusBadge = (status: PackageStatus) => {

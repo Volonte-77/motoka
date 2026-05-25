@@ -82,19 +82,24 @@ export default function ChauffeursPage() {
   }, [user?.agencyId]);
 
   const onSubmit = async (values: DriverFormValues) => {
-    const driverData: AppUser = {
-      id: editingDriver?.id || Math.random().toString(36).substr(2, 9),
-      role: "Chauffeur" as UserRole,
-      agencyId: user?.agencyId || "default-agency",
-      siteAccess: "Agence",
-      ...values,
-    };
+    try {
+      const driverData: AppUser = {
+        id: editingDriver?.id || Math.random().toString(36).substr(2, 9),
+        role: "Chauffeur" as UserRole,
+        agencyId: user?.agencyId || "default-agency",
+        siteAccess: "Agence",
+        ...values,
+      };
 
-    await mockApi.drivers.save(driverData);
-    await loadDrivers();
-    setIsDialogOpen(false);
-    setEditingDriver(null);
-    form.reset();
+      await mockApi.drivers.save(driverData);
+      await loadDrivers();
+      setIsDialogOpen(false);
+      setEditingDriver(null);
+      form.reset();
+      toast.success(editingDriver ? "Chauffeur mis à jour" : "Nouveau chauffeur enregistré");
+    } catch (error) {
+      toast.error("Erreur lors de l'enregistrement du chauffeur");
+    }
   };
 
   const handleEdit = (driver: AppUser) => {

@@ -93,21 +93,26 @@ export default function CoursesPage() {
   }, [user?.agencyId]);
 
   const onSubmit = async (values: TripFormValues) => {
-    const selectedDriver = drivers.find(d => d.id === values.driverId);
-    const selectedVehicle = vehicles.find(v => v.id === values.vehicleId);
+    try {
+      const selectedDriver = drivers.find(d => d.id === values.driverId);
+      const selectedVehicle = vehicles.find(v => v.id === values.vehicleId);
 
-    const tripData: Trip = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...values,
-      driver: selectedDriver?.name || "Inconnu",
-      vehicle: selectedVehicle ? `${selectedVehicle.model} (${selectedVehicle.plate})` : "Inconnu",
-      agencyId: user?.agencyId || "default-agency",
-    };
+      const tripData: Trip = {
+        id: Math.random().toString(36).substr(2, 9),
+        ...values,
+        driver: selectedDriver?.name || "Inconnu",
+        vehicle: selectedVehicle ? `${selectedVehicle.model} (${selectedVehicle.plate})` : "Inconnu",
+        agencyId: user?.agencyId || "default-agency",
+      };
 
-    await mockApi.trips.save(tripData);
-    await loadData();
-    setIsDialogOpen(false);
-    form.reset();
+      await mockApi.trips.save(tripData);
+      await loadData();
+      setIsDialogOpen(false);
+      form.reset();
+      toast.success("Course planifiée avec succès");
+    } catch (error) {
+      toast.error("Erreur lors de la planification de la course");
+    }
   };
 
   const getStatusBadge = (status: TripStatus) => {

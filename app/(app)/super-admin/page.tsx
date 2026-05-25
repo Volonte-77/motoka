@@ -83,18 +83,23 @@ export default function SuperAdminPage() {
   }, []);
 
   const onSubmit = async (values: AgencyFormValues) => {
-    const newAgency: Agency = {
-      id: Math.random().toString(36).substr(2, 9),
-      createdAt: new Date().toISOString(),
-      ...values,
-    };
+    try {
+      const newAgency: Agency = {
+        id: Math.random().toString(36).substr(2, 9),
+        createdAt: new Date().toISOString(),
+        ...values,
+      };
 
-    const currentAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, [...currentAgencies, newAgency]);
-    
-    await loadAgencies();
-    setIsDialogOpen(false);
-    form.reset();
+      const currentAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
+      await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, [...currentAgencies, newAgency]);
+      
+      await loadAgencies();
+      setIsDialogOpen(false);
+      form.reset();
+      toast.success(`L'agence ${values.name} a été activée avec succès`);
+    } catch (error) {
+      toast.error("Erreur lors de l'activation de l'agence");
+    }
   };
 
   const getPlanBadge = (plan: SubscriptionPlan) => {

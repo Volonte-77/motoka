@@ -78,18 +78,23 @@ export default function CaissePage() {
   }, [user?.agencyId]);
 
   const onSubmit = async (values: TransactionFormValues) => {
-    const transaction: CashTransaction = {
-      id: Math.random().toString(36).substr(2, 9),
-      agencyId: user?.agencyId || "default-agency",
-      timestamp: new Date().toISOString(),
-      userId: user?.id,
-      ...values,
-    };
+    try {
+      const transaction: CashTransaction = {
+        id: Math.random().toString(36).substr(2, 9),
+        agencyId: user?.agencyId || "default-agency",
+        timestamp: new Date().toISOString(),
+        userId: user?.id,
+        ...values,
+      };
 
-    await mockApi.cash.save(transaction);
-    await loadTransactions();
-    setIsDialogOpen(false);
-    form.reset();
+      await mockApi.cash.save(transaction);
+      await loadTransactions();
+      setIsDialogOpen(false);
+      form.reset();
+      toast.success(values.type === "Entrée" ? "Recette enregistrée" : "Dépense enregistrée");
+    } catch (error) {
+      toast.error("Erreur lors de l'enregistrement de l'opération");
+    }
   };
 
   const totals = transactions.reduce((acc, curr) => {
