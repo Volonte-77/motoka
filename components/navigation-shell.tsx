@@ -7,12 +7,14 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Car, Package, Users, Settings, 
-  LogOut, Menu, Wallet, ShieldAlert, BarChart3, User
+  LogOut, Menu, Wallet, ShieldAlert, BarChart3, User,
+  Building2, CreditCard, Activity
 } from "lucide-react";
 
 // Liste de navigation enrichie avec les restrictions de rôles (RBAC)
 const navigationItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["Super Admin SaaS", "Admin Agence", "Dispatcher / Opérateur"] },
+  // --- ESPACE AGENCE ---
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["Admin Agence", "Dispatcher / Opérateur"] },
   { name: "Chauffeurs", href: "/chauffeurs", icon: Users, roles: ["Admin Agence", "Dispatcher / Opérateur"] },
   { name: "Véhicules", href: "/vehicules", icon: Car, roles: ["Admin Agence", "Dispatcher / Opérateur"] },
   { name: "Courses", href: "/courses", icon: Car, roles: ["Admin Agence", "Dispatcher / Opérateur", "Chauffeur"] },
@@ -20,7 +22,14 @@ const navigationItems = [
   { name: "Caisse", href: "/caisse", icon: Wallet, roles: ["Admin Agence", "Dispatcher / Opérateur"] },
   { name: "Rapports", href: "/rapports", icon: BarChart3, roles: ["Admin Agence"] }, 
   { name: "Utilisateurs", href: "/utilisateurs", icon: Users, roles: ["Admin Agence"] },
-  { name: "Super Admin", href: "/super-admin", icon: ShieldAlert, roles: ["Super Admin SaaS"] },
+
+  // --- ESPACE SUPER ADMIN SaaS ---
+  { name: "SaaS Overview", href: "/super-admin", icon: LayoutDashboard, roles: ["Super Admin SaaS"] },
+  { name: "Agences", href: "/super-admin/agencies", icon: Building2, roles: ["Super Admin SaaS"] },
+  { name: "Plans & Tarifs", href: "/super-admin/plans", icon: CreditCard, roles: ["Super Admin SaaS"] },
+  { name: "Logs Système", href: "/super-admin/logs", icon: Activity, roles: ["Super Admin SaaS"] },
+
+  // --- COMMUN ---
   { name: "Paramètres", href: "/settings", icon: Settings, roles: ["Super Admin SaaS", "Admin Agence", "Dispatcher / Opérateur", "Chauffeur"] },
 ];
 

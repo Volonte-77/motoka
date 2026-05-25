@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/useAuthStore";
 import { SessionUser, UserRole } from "@/types";
-import { defaultSuperAdmin, defaultSuperAdminPassword } from "@/components/saas-mock";
+import { defaultSuperAdmin, defaultSuperAdminPassword, backupSuperAdmin, backupSuperAdminPassword } from "@/components/saas-mock";
 import { Combobox } from "@/components/ui/combobox";
 import { getHomeRouteByRole } from "@/lib/routing-middleware";
 
@@ -32,32 +32,43 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMessage(null);
     
-    console.log("Tentative de connexion:", { email, role });
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-    // Validation basique pour le Super Admin (simulation)
+    console.log("Tentative de connexion:", { cleanEmail, role });
+
+    // Validation pour le Super Admin (simulation multi-comptes)
     if (role === "Super Admin SaaS") {
-      if (email !== defaultSuperAdmin.email || password !== defaultSuperAdminPassword) {
-        setErrorMessage("Identifiants Super Admin invalides. Utilisez superadmin@motoka.com / motoka123.");
+      let authenticatedUser: SessionUser | null = null;
+
+      if (cleanEmail === defaultSuperAdmin.email && cleanPassword === defaultSuperAdminPassword) {
+        authenticatedUser = defaultSuperAdmin;
+      } else if (cleanEmail === backupSuperAdmin.email && cleanPassword === backupSuperAdminPassword) {
+        authenticatedUser = backupSuperAdmin;
+      }
+
+      if (!authenticatedUser) {
+        setErrorMessage("Identifiants Super Admin incorrects. Utilisez admin@motoka.com / admin123");
         return;
       }
+
+      await login(authenticatedUser);
+      router.push("/super-admin");
+      return;
     }
 
-    const userSession: SessionUser = role === "Super Admin SaaS"
-      ? defaultSuperAdmin
-      : {
-          id: `user-${Date.now()}`,
-          name: email.split("@")[0] || "Utilisateur",
-          email,
-          role,
-          agencyId: "AGE-001",
-          siteAccess: role === "Chauffeur" ? "Véhicule" : "Agence Principale",
-        };
+    // Connexion normale pour les autres rôles
+    const userSession: SessionUser = {
+      id: `user-${Date.now()}`,
+      name: cleanEmail.split("@")[0] || "Utilisateur",
+      email: cleanEmail,
+      role,
+      agencyId: "AGE-001",
+      siteAccess: role === "Chauffeur" ? "Véhicule" : "Agence Principale",
+    };
 
     await login(userSession);
-    
-    // Redirection intelligente basée sur le rôle
-    const homeRoute = getHomeRouteByRole(role);
-    router.push(homeRoute);
+    router.push(getHomeRouteByRole(role));
   };
 
   return (

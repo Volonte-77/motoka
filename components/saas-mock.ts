@@ -59,7 +59,17 @@ export const defaultSuperAdmin: SessionUser = {
   siteAccess: "Global",
 };
 
+export const backupSuperAdmin: SessionUser = {
+  id: "SUPER-ADMIN-002",
+  name: "Admin de Secours",
+  email: "admin@motoka.com",
+  role: "Super Admin SaaS",
+  agencyId: null,
+  siteAccess: "Global",
+};
+
 export const defaultSuperAdminPassword = "motoka123";
+export const backupSuperAdminPassword = "admin123";
 
 // Clés constantes pour localforage conformes à vos exigences
 export const STORAGE_KEYS = {
