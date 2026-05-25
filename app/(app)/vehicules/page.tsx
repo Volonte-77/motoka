@@ -38,6 +38,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 // Schéma de validation Zod
 const vehicleSchema = z.object({
@@ -87,17 +88,22 @@ export default function VehiculesPage() {
   }, [user?.agencyId]);
 
   const onSubmit = async (values: VehicleFormValues) => {
-    const vehicleData: Vehicle = {
-      id: editingVehicle?.id || Math.random().toString(36).substr(2, 9),
-      ...values,
-      agencyId: user?.agencyId || "default-agency",
-    };
+    try {
+      const vehicleData: Vehicle = {
+        id: editingVehicle?.id || Math.random().toString(36).substr(2, 9),
+        ...values,
+        agencyId: user?.agencyId || "default-agency",
+      };
 
-    await mockApi.vehicles.save(vehicleData);
-    await loadVehicles();
-    setIsDialogOpen(false);
-    setEditingVehicle(null);
-    form.reset();
+      await mockApi.vehicles.save(vehicleData);
+      await loadVehicles();
+      setIsDialogOpen(false);
+      setEditingVehicle(null);
+      form.reset();
+      toast.success(editingVehicle ? "Véhicule mis à jour" : "Véhicule ajouté avec succès");
+    } catch (error) {
+      toast.error("Une erreur est survenue lors de l'enregistrement");
+    }
   };
 
   const handleEdit = (vehicle: Vehicle) => {
@@ -116,8 +122,13 @@ export default function VehiculesPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce véhicule ?")) {
-      await mockApi.vehicles.delete(id);
-      await loadVehicles();
+      try {
+        await mockApi.vehicles.delete(id);
+        await loadVehicles();
+        toast.success("Véhicule supprimé");
+      } catch (error) {
+        toast.error("Erreur lors de la suppression");
+      }
     }
   };
 
@@ -244,7 +255,7 @@ export default function VehiculesPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="dark:text-white">
+            <DialogTitle className="text-zinc-900 dark:text-white">
               {editingVehicle ? "Modifier le véhicule" : "Ajouter un véhicule"}
             </DialogTitle>
             <DialogDescription>
@@ -291,16 +302,18 @@ export default function VehiculesPage() {
                     <FormItem>
                       <FormLabel>Type</FormLabel>
                       <FormControl>
-                        <select 
-                          {...field} 
-                          className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                          <option value="Bus">Bus</option>
-                          <option value="Taxi">Taxi</option>
-                          <option value="Camion">Camion</option>
-                          <option value="Moto">Moto</option>
-                          <option value="Autre">Autre</option>
-                        </select>
+                        <Combobox
+                          options={[
+                            { value: "Bus", label: "Bus" },
+                            { value: "Taxi", label: "Taxi" },
+                            { value: "Camion", label: "Camion" },
+                            { value: "Moto", label: "Moto" },
+                            { value: "Autre", label: "Autre" },
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Choisir le type"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -313,15 +326,17 @@ export default function VehiculesPage() {
                     <FormItem>
                       <FormLabel>Statut</FormLabel>
                       <FormControl>
-                        <select 
-                          {...field} 
-                          className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                          <option value="Disponible">Disponible</option>
-                          <option value="Mission">En mission</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Hors service">Hors service</option>
-                        </select>
+                        <Combobox
+                          options={[
+                            { value: "Disponible", label: "Disponible" },
+                            { value: "Mission", label: "En mission" },
+                            { value: "Maintenance", label: "Maintenance" },
+                            { value: "Hors service", label: "Hors service" },
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Choisir le statut"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

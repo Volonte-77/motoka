@@ -39,6 +39,7 @@ import { AppUser, UserRole } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import localforage from "localforage";
 import { STORAGE_KEYS } from "@/types";
+import { Combobox } from "@/components/ui/combobox";
 
 const userSchema = z.object({
   name: z.string().min(3, "Le nom est requis"),
@@ -218,12 +219,17 @@ export default function UtilisateursPage() {
                   <FormItem>
                     <FormLabel>Rôle / Accès</FormLabel>
                     <FormControl>
-                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                        <option value="Dispatcher">Guichetier (Dispatcher)</option>
-                        <option value="Admin Agence">Administrateur d'Agence</option>
-                        <option value="Comptable">Comptable</option>
-                        <option value="Chauffeur">Chauffeur</option>
-                      </select>
+                      <Combobox
+                        options={[
+                          { value: "Dispatcher", label: "Guichetier (Dispatcher)" },
+                          { value: "Admin Agence", label: "Administrateur d'Agence" },
+                          { value: "Comptable", label: "Comptable" },
+                          { value: "Chauffeur", label: "Chauffeur" },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Choisir un rôle"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

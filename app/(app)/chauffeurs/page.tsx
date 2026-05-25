@@ -37,6 +37,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 const driverSchema = z.object({
   name: z.string().min(3, "Le nom est requis"),
@@ -298,12 +300,17 @@ export default function ChauffeursPage() {
                     <FormItem>
                       <FormLabel>Statut Initial</FormLabel>
                       <FormControl>
-                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                          <option value="Disponible">Disponible</option>
-                          <option value="Mission">En mission</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Hors service">Hors service</option>
-                        </select>
+                        <Combobox
+                          options={[
+                            { value: "Disponible", label: "Disponible" },
+                            { value: "Mission", label: "En mission" },
+                            { value: "Maintenance", label: "Maintenance" },
+                            { value: "Hors service", label: "Hors service" },
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Choisir le statut"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Plus, Search, Building2, ShieldCheck, Calendar, MoreHorizontal, LayoutGrid, List } from "lucide-react";
-import { mockApi } from "@/lib/mock-api"; // Je vais l'étendre pour les agences
+import { mockApi } from "@/lib/mock-api";
 import { Agency, SubscriptionPlan, SubscriptionStatus } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/form";
 import localforage from "localforage";
 import { STORAGE_KEYS } from "@/types";
+import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 const agencySchema = z.object({
   name: z.string().min(3, "Nom de l'agence requis"),
@@ -252,11 +254,16 @@ export default function SuperAdminPage() {
                   <FormItem>
                     <FormLabel>Plan de souscription</FormLabel>
                     <FormControl>
-                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                        <option value="Basique">Basique</option>
-                        <option value="Standard">Standard</option>
-                        <option value="Premium">Premium</option>
-                      </select>
+                      <Combobox
+                        options={[
+                          { value: "Basique", label: "Basique" },
+                          { value: "Standard", label: "Standard" },
+                          { value: "Premium", label: "Premium" },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Choisir un plan"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -265,11 +272,16 @@ export default function SuperAdminPage() {
                   <FormItem>
                     <FormLabel>Statut</FormLabel>
                     <FormControl>
-                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                        <option value="Actif">Actif</option>
-                        <option value="Essai">Période d'essai</option>
-                        <option value="Expiré">Expiré</option>
-                      </select>
+                      <Combobox
+                        options={[
+                          { value: "Actif", label: "Actif" },
+                          { value: "Essai", label: "Période d'essai" },
+                          { value: "Expiré", label: "Expiré" },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Choisir le statut"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

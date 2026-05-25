@@ -37,6 +37,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 const tripSchema = z.object({
   route: z.string().min(5, "L'itinéraire est requis"),
@@ -174,7 +176,7 @@ export default function CoursesPage() {
                           <div className="p-2 rounded-lg bg-primary/10 text-primary">
                             <MapPin size={18} />
                           </div>
-                          <span className="font-bold text-lg dark:text-white">{trip.route}</span>
+                          <span className="font-bold text-lg text-zinc-900 dark:text-white">{trip.route}</span>
                         </div>
                         <div className="flex flex-wrap gap-4 text-sm text-zinc-500">
                           <div className="flex items-center gap-1.5"><Clock size={14} /> {trip.departureTime.replace("T", " à ")}</div>
@@ -246,10 +248,12 @@ export default function CoursesPage() {
                     <FormItem>
                       <FormLabel>Chauffeur</FormLabel>
                       <FormControl>
-                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                          <option value="">Sélectionner...</option>
-                          {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
+                        <Combobox
+                          options={drivers.map(d => ({ value: d.id, label: d.name }))}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Sélectionner un chauffeur"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -262,10 +266,12 @@ export default function CoursesPage() {
                     <FormItem>
                       <FormLabel>Véhicule</FormLabel>
                       <FormControl>
-                        <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                          <option value="">Sélectionner...</option>
-                          {vehicles.map(v => <option key={v.id} value={v.id}>{v.model} ({v.plate})</option>)}
-                        </select>
+                        <Combobox
+                          options={vehicles.map(v => ({ value: v.id, label: `${v.model} (${v.plate})` }))}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Sélectionner un véhicule"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

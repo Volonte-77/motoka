@@ -37,6 +37,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { toast } from "sonner";
 
 const packageSchema = z.object({
   sender: z.string().min(3, "Expéditeur requis"),
@@ -52,7 +53,7 @@ const packageSchema = z.object({
 type PackageFormValues = z.infer<typeof packageSchema>;
 
 export default function ColisPage() {
-  const { user } = userAuthStore();
+  const { user } = useAuthStore();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -239,6 +240,3 @@ export default function ColisPage() {
     </div>
   );
 }
-
-// Correction d'une faute de frappe dans l'import/usage de useAuthStore
-import { useAuthStore as userAuthStore } from "@/store/useAuthStore";

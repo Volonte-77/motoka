@@ -38,6 +38,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 const transactionSchema = z.object({
   type: z.enum(["Entrée", "Sortie"]),
@@ -125,7 +127,7 @@ export default function CaissePage() {
             <Wallet className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold dark:text-white">{(totals.in - totals.out).toLocaleString()} FCFA</div>
+            <div className="text-2xl font-bold text-zinc-900 dark:text-white">{(totals.in - totals.out).toLocaleString()} FCFA</div>
             <p className="text-xs text-zinc-500 mt-1">Trésorerie disponible</p>
           </CardContent>
         </Card>
@@ -268,13 +270,18 @@ export default function CaissePage() {
                   <FormItem>
                     <FormLabel>Catégorie</FormLabel>
                     <FormControl>
-                      <select {...field} className="flex h-10 w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-sm">
-                        <option value="Billet">Billetterie</option>
-                        <option value="Fret">Fret / Colis</option>
-                        <option value="Carburant">Carburant</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Autre">Autre</option>
-                      </select>
+                      <Combobox
+                        options={[
+                          { value: "Billet", label: "Billetterie" },
+                          { value: "Fret", label: "Fret / Colis" },
+                          { value: "Carburant", label: "Carburant" },
+                          { value: "Maintenance", label: "Maintenance" },
+                          { value: "Autre", label: "Autre" },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Choisir une catégorie"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

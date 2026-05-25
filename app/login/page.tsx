@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/useAuthStore";
 import { SessionUser, UserRole } from "@/types";
 import { defaultSuperAdmin, defaultSuperAdminPassword } from "@/components/saas-mock";
+import { Combobox } from "@/components/ui/combobox";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +18,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("Admin Agence");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const roleOptions = [
+    { value: "Admin Agence", label: "Admin Agence" },
+    { value: "Super Admin SaaS", label: "Super Admin SaaS" },
+    { value: "Dispatcher / Opérateur", label: "Dispatcher / Opérateur" },
+  ];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,16 +82,12 @@ export default function LoginPage() {
                 <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300" htmlFor="role">
                   Se connecter en tant que
                 </label>
-                <select
-                  id="role"
+                <Combobox
+                  options={roleOptions}
                   value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-zinc-900 dark:text-white focus-visible:ring-primary outline-none focus:ring-2"
-                >
-                  <option value="Admin Agence">Admin Agence</option>
-                  <option value="Super Admin SaaS">Super Admin SaaS</option>
-                  <option value="Dispatcher / Opérateur">Dispatcher / Opérateur</option>
-                </select>
+                  onChange={(val) => setRole(val as UserRole)}
+                  placeholder="Choisir un rôle"
+                />
                 {role === "Super Admin SaaS" ? (
                   <p className="text-xs text-zinc-500">Super Admin par défaut : superadmin@motoka.com</p>
                 ) : null}
