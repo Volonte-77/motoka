@@ -49,22 +49,22 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4 bg-[#09090b]">
+    <main className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-[#09090b] text-zinc-950 dark:text-zinc-50 transition-colors duration-200">
       <div className="w-full max-w-[400px] space-y-6">
         {/* Logo / Entête de l'application */}
         <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="text-2xl font-bold tracking-wider text-white">
+          <div className="text-2xl font-bold tracking-wider text-zinc-900 dark:text-white">
             MO<span className="text-primary">TO</span>KA
           </div>
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
             Gestion de transport intelligente
           </p>
         </div>
 
-        <Card className="border border-zinc-800 bg-white dark:bg-[#121214]">
+        <Card className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] shadow-sm">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl font-semibold text-white">Connexion</CardTitle>
-            <CardDescription className="text-zinc-400">
+            <CardTitle className="text-xl font-semibold text-zinc-900 dark:text-white">Connexion</CardTitle>
+            <CardDescription className="text-zinc-500 dark:text-zinc-400">
               Saisissez vos identifiants pour accéder à votre espace agence.
             </CardDescription>
           </CardHeader>
@@ -72,14 +72,14 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-zinc-300" htmlFor="role">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300" htmlFor="role">
                   Se connecter en tant que
                 </label>
                 <select
                   id="role"
                   value={role}
                   onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="w-full rounded-md border border-zinc-800 bg-[#18181b] px-3 py-2 text-white focus-visible:ring-primary"
+                  className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 text-zinc-900 dark:text-white focus-visible:ring-primary outline-none focus:ring-2"
                 >
                   <option value="Admin Agence">Admin Agence</option>
                   <option value="Super Admin SaaS">Super Admin SaaS</option>
@@ -91,7 +91,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-zinc-300" htmlFor="email">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300" htmlFor="email">
                   Adresse Email
                 </label>
                 <Input
@@ -101,13 +101,13 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-[#18181b] border-zinc-800 text-white focus-visible:ring-primary"
+                  className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white focus-visible:ring-primary"
                 />
               </div>
               
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-300" htmlFor="password">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300" htmlFor="password">
                     Mot de passe
                   </label>
                   <a href="#" className="text-xs text-primary hover:underline">
@@ -120,19 +120,19 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-[#18181b] border-zinc-800 text-white focus-visible:ring-primary"
+                  className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white focus-visible:ring-primary"
                 />
               </div>
 
               {errorMessage ? (
-                <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-sm text-rose-500">
+                <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-sm text-rose-500 font-medium">
                   {errorMessage}
                 </div>
               ) : null}
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full bg-primary text-primary-foreground font-medium hover:opacity-90 cursor-pointer">
+              <Button type="submit" className="w-full bg-primary text-white font-medium hover:opacity-90 cursor-pointer shadow-sm">
                 Se connecter
               </Button>
               <div className="text-center text-xs text-zinc-500 mt-2">

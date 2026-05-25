@@ -43,7 +43,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Paramètres</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">Paramètres</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez vos préférences et la configuration de l'agence.</p>
       </div>
 

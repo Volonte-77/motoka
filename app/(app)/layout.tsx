@@ -41,9 +41,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, loading, router]);
 
   // Afficher le loading ou un skeleton si nécessaire
-  if (loading || !user) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0a0a0a]">
+      <div className="flex items-center justify-center h-screen bg-zinc-50 dark:bg-[#09090b]">
         <div className="text-zinc-400">Chargement...</div>
       </div>
     );

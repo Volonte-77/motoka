@@ -78,7 +78,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
           Bonjour, {user?.name}
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">

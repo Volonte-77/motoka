@@ -34,7 +34,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-xs font-mono text-zinc-500">
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center text-xs font-mono text-zinc-500">
         INITIALIZING SECURITY LAYERS...
       </div>
     );

@@ -48,7 +48,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Thème clair (Optionnel mais propre) */
+/* Thème clair (Défaut) */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -84,8 +84,8 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* Thème sombre "Cyber-Precision" par défaut */
-.dark, :root {
+/* Thème sombre "Cyber-Precision" */
+.dark {
   --background: oklch(0.129 0.006 285.84); /* Noir ultra profond #09090b */
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.141 0.005 285.82);       /* Gris très sombre pour les cartes #121214 */
@@ -118,34 +118,35 @@
   --sidebar-border: oklch(0.228 0.006 285.89);
   --sidebar-ring: oklch(0.696 0.17 149.21);
 }
+
 /* --- PERSONNALISATION DES SCROLLBARS GLOBALES --- */
 
-/* Taille de la scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;  /* Pour le défilement vertical */
-  height: 6px; /* Pour le défilement horizontal (ex: filtres ou tableaux) */
+  width: 6px;
+  height: 6px;
 }
 
-/* Fond de la piste (Track) */
 ::-webkit-scrollbar-track {
-  background: #09090b; 
+  background: transparent; 
 }
 
-/* Barre de défilement elle-même (Thumb) */
 ::-webkit-scrollbar-thumb {
-  background: #27272a; /* zinc-800 */
+  background: oklch(0.8 0 0 / 0.2); 
   border-radius: 9999px;
 }
 
-/* Couleur au survol */
+.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.3 0 0 / 0.3);
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46; /* zinc-700 */
+  background: oklch(0.5 0 0 / 0.5);
 }
 
 /* Optionnel : Pour Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #27272a #09090b;
+  scrollbar-color: oklch(0.5 0 0 / 0.5) transparent;
 }
 @layer base {
   * {
