@@ -42,6 +42,25 @@ import localforage from "localforage";
 import { STORAGE_KEYS } from "@/types";
 import { Combobox } from "@/components/ui/combobox";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 const userSchema = z.object({
   name: z.string().min(3, "Le nom est requis"),
   email: z.string().email("Email invalide"),
@@ -58,6 +77,9 @@ export default function UtilisateursPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<AppUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const form = useForm<UserFormValues>({
@@ -71,6 +93,27 @@ export default function UtilisateursPage() {
     },
   });
 
+  // Reset form when opening for create or edit
+  useEffect(() => {
+    if (userToEdit) {
+      form.reset({
+        name: userToEdit.name,
+        email: userToEdit.email,
+        role: userToEdit.role as any,
+        phone: userToEdit.phone || "",
+        branchId: userToEdit.branchId || "global",
+      });
+    } else {
+      form.reset({
+        name: "",
+        email: "",
+        role: "Dispatcher",
+        phone: "",
+        branchId: "global",
+      });
+    }
+  }, [userToEdit, isDialogOpen]);
+
   const loadData = async () => {
     if (!currentUser?.agencyId) return;
     setLoading(true);
@@ -80,38 +123,79 @@ export default function UtilisateursPage() {
       mockApi.agencies.getBranches(currentUser.agencyId)
     ]);
     
-    // Filtrer par agence
-    const agencyUsers = userData.filter(u => u.agencyId === currentUser.agencyId);
-    setUsers(agencyUsers);
+    // LOGIQUE DE FILTRAGE HIÉRARCHIQUE :
+    // 1. Admin Agence voit TOUT le monde de l'agence
+    // 2. Admin Succursale voit seulement les gens de SA succursale
+    let filteredData = userData.filter(u => u.agencyId === currentUser.agencyId);
+    
+    if (currentUser.role === "Admin Succursale" && currentUser.branchId) {
+      filteredData = filteredData.filter(u => u.branchId === currentUser.branchId);
+    }
+
+    setUsers(filteredData);
     setBranches(branchData);
     setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-  }, [currentUser?.agencyId]);
+  }, [currentUser?.agencyId, currentUser?.branchId, currentUser?.role]);
 
   const onSubmit = async (values: UserFormValues) => {
     try {
-      const newUser: AppUser = {
-        id: Math.random().toString(36).substr(2, 9),
-        agencyId: currentUser?.agencyId || "default",
-        siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
-        ...values,
-        branchId: values.branchId === "global" ? null : values.branchId,
-        password: "motoka2026", // Mot de passe par défaut
-        mustChangePassword: true, // Forcer le changement au premier login
-      } as AppUser;
-
-      const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-      await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...currentUsers, newUser]);
+      const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+      
+      if (userToEdit) {
+        // Mode ÉDITION
+        const updatedUsers = allUsers.map(u => {
+          if (u.id === userToEdit.id) {
+            return {
+              ...u,
+              ...values,
+              branchId: values.branchId === "global" ? null : values.branchId,
+              siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
+            };
+          }
+          return u;
+        });
+        await localforage.setItem(STORAGE_KEYS.USERS_LIST, updatedUsers);
+        toast.success(`L'utilisateur ${values.name} a été mis à jour`);
+      } else {
+        // Mode CRÉATION
+        const newUser: AppUser = {
+          id: Math.random().toString(36).substr(2, 9),
+          agencyId: currentUser?.agencyId || "default",
+          siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
+          ...values,
+          branchId: values.branchId === "global" ? null : values.branchId,
+          password: "motoka2026",
+          mustChangePassword: true,
+        } as AppUser;
+        await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...allUsers, newUser]);
+        toast.success(`L'utilisateur ${values.name} a été créé`);
+      }
       
       await loadData();
       setIsDialogOpen(false);
+      setUserToEdit(null);
       form.reset();
-      toast.success(`L'utilisateur ${values.name} a été créé`);
     } catch (error) {
-      toast.error("Erreur lors de la création de l'utilisateur");
+      toast.error("Erreur lors de l'enregistrement de l'utilisateur");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+    try {
+      const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+      const updatedUsers = allUsers.filter(u => u.id !== userToDelete.id);
+      await localforage.setItem(STORAGE_KEYS.USERS_LIST, updatedUsers);
+      toast.success("Utilisateur supprimé");
+      await loadData();
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -202,9 +286,35 @@ export default function UtilisateursPage() {
                     {u.phone || "N/A"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4 text-zinc-500" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                          <MoreVertical className="h-4 w-4 text-zinc-500" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setUserToEdit(u);
+                            setIsDialogOpen(true);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" /> Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setUserToDelete(u);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="text-rose-500 cursor-pointer focus:text-rose-500"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -213,11 +323,19 @@ export default function UtilisateursPage() {
         </Table>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* DIALOGUE CRÉATION / ÉDITION */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) setUserToEdit(null);
+      }}>
         <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle>Ajouter un membre</DialogTitle>
-            <DialogDescription>Créez un compte pour un nouveau collaborateur.</DialogDescription>
+            <DialogTitle>{userToEdit ? "Modifier le membre" : "Ajouter un membre"}</DialogTitle>
+            <DialogDescription>
+              {userToEdit 
+                ? "Mettez à jour les informations du collaborateur." 
+                : "Créez un compte pour un nouveau collaborateur."}
+            </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
@@ -275,12 +393,36 @@ export default function UtilisateursPage() {
 
               <DialogFooter className="pt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                <Button type="submit" className="bg-primary text-white">Créer le compte</Button>
+                <Button type="submit" className="bg-primary text-white">
+                  {userToEdit ? "Enregistrer les modifications" : "Créer le compte"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* DIALOGUE SUPPRESSION */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera le compte de <strong>{userToDelete?.name}</strong>. 
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-rose-600 hover:bg-rose-700 text-white border-none cursor-pointer"
+            >
+              Supprimer le compte
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
