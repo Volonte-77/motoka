@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Search, Package as PackageIcon, User, Phone, MapPin, QrCode, ShieldCheck, Building2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { 
+  Plus, Search, Package as PackageIcon, User, Phone, 
+  MapPin, QrCode, ShieldCheck, LayoutGrid, List, Filter,
+  History, ArchiveRestore, Clock, ChevronRight
+} from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
 import { Package, PackageStatus, Branch } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -39,6 +43,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
+import { cn } from "@/lib/utils";
 
 const packageSchema = z.object({
   sender: z.string().min(3, "Expéditeur requis"),
@@ -61,6 +66,10 @@ export default function ColisPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Nouveaux états pour l'affichage intelligent
+  const [displayMode, setDisplayMode] = useState<"table" | "grid">("table");
+  const [showArchived, setShowArchived] = useState(false); // Par défaut on ne montre pas l'historique
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
@@ -96,6 +105,28 @@ export default function ColisPage() {
     loadData();
   }, [user?.agencyId, user?.branchId, user?.role]);
 
+  // LOGIQUE DE FILTRAGE INTELLIGENTE
+  const filteredPackages = useMemo(() => {
+    return packages.filter(p => {
+      // 1. Filtrage par recherche
+      const matchesSearch = 
+        p.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        p.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.receiver.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+
+      // 2. Filtrage intelligent (Archive vs Actif)
+      if (!showArchived) {
+        // Cacher si déjà livré ou annulé (On ne garde que l'opérationnel)
+        const isStale = p.status === "Livré" || p.status === "Annulé";
+        if (isStale) return false;
+      }
+
+      return true;
+    });
+  }, [packages, searchTerm, showArchived]);
+
   const onSubmit = async (values: PackageFormValues) => {
     try {
       const { branchId, ...rest } = values;
@@ -104,6 +135,9 @@ export default function ColisPage() {
         otp: Math.floor(1000 + Math.random() * 9000).toString(),
         agencyId: user?.agencyId || "default-agency",
         branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
+        // Ensure non-optional fields expected by Package type are provided
+        weight: rest.weight ?? "1kg",
+        value: rest.value ?? "0 FCFA",
         ...rest,
       };
 
@@ -111,10 +145,7 @@ export default function ColisPage() {
       await loadData();
       setIsDialogOpen(false);
       form.reset();
-      toast.success(`Colis enregistré ! OTP: ${pkgData.otp}`, {
-        description: "Communiquez ce code au destinataire pour la récupération.",
-        duration: 5000,
-      });
+      toast.success(`Colis enregistré ! OTP: ${pkgData.otp}`);
     } catch (error) {
       toast.error("Erreur lors de l'enregistrement du colis");
     }
@@ -130,36 +161,64 @@ export default function ColisPage() {
     }
   };
 
-  const filteredPackages = packages.filter(p => 
-    p.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.receiver.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* HEADER AVEC CONTRÔLES D'AFFICHAGE */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground uppercase tracking-tighter">
-            {user?.role === "Admin Succursale" ? "Registre des Colis" : "Fret & Logistique"}
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground uppercase tracking-tighter flex items-center gap-2">
+            <PackageIcon className="text-primary h-8 w-8" />
+            {showArchived ? "Historique des Colis" : "Registre des Colis Actifs"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {user?.role === "Admin Succursale" 
-              ? `Colis enregistrés à ${branches.find(b => b.id === user.branchId)?.name || "votre succursale"}.` 
-              : "Suivi global des expéditions de l'agence."}
+          <p className="text-sm text-muted-foreground font-medium">
+            {showArchived 
+              ? "Consultation des archives et livraisons passées." 
+              : "Gestion des expéditions en cours de traitement."}
           </p>
         </div>
-        <Button onClick={() => {
-          form.reset({
-            sender: "", receiver: "", phoneReceiver: "", description: "", route: "", weight: "1kg", value: "0 FCFA", status: "En attente",
-            branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global"
-          });
-          setIsDialogOpen(true);
-        }} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm">
-          <Plus className="mr-2 h-4 w-4" /> Nouvel Envoi
-        </Button>
+
+        <div className="flex items-center gap-2">
+          {/* Toggle Archive */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowArchived(!showArchived)}
+            className={cn(
+              "h-9 px-4 gap-2 font-bold text-[10px] uppercase tracking-widest border-border transition-all",
+              showArchived ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : "bg-card hover:bg-muted"
+            )}
+          >
+            {showArchived ? <History size={14} /> : <ArchiveRestore size={14} />}
+            {showArchived ? "Voir Actifs" : "Voir Archives"}
+          </Button>
+
+          {/* Sélecteur de Mode d'Affichage */}
+          <div className="bg-muted/50 p-1 rounded-xl border border-border flex items-center gap-1">
+            <Button 
+              variant={displayMode === "table" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => setDisplayMode("table")}
+              className={cn("h-7 w-7 rounded-lg", displayMode === "table" && "shadow-sm")}
+            >
+              <List size={14} />
+            </Button>
+            <Button 
+              variant={displayMode === "grid" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => setDisplayMode("grid")}
+              className={cn("h-7 w-7 rounded-lg", displayMode === "grid" && "shadow-sm")}
+            >
+              <LayoutGrid size={14} />
+            </Button>
+          </div>
+
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm h-9">
+            <Plus className="mr-2 h-4 w-4" /> Nouvel Envoi
+          </Button>
+        </div>
       </div>
 
+      {/* RECHERCHE INTELLIGENTE */}
       <Card className="border-border bg-card shadow-sm">
         <CardContent className="p-4">
           <div className="relative">
@@ -168,60 +227,120 @@ export default function ColisPage() {
               placeholder="Rechercher par ID, expéditeur ou destinataire..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-muted/30 border-border"
+              className="pl-10 bg-muted/30 border-border focus-visible:ring-primary"
             />
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="border-border bg-card"><CardContent className="p-4"><Skeleton className="h-40 w-full" /></CardContent></Card>
-          ))
-        ) : filteredPackages.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-xl font-medium italic">
-            Aucun colis enregistré.
+      {loading ? (
+        <div className={displayMode === "grid" ? "grid gap-4 md:grid-cols-3" : "space-y-2"}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="border-border bg-card p-4"><Skeleton className="h-32 w-full" /></Card>
+          ))}
+        </div>
+      ) : filteredPackages.length === 0 ? (
+        <div className="text-center py-20 bg-card border-2 border-dashed border-border rounded-2xl">
+          <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <PackageIcon size={32} className="text-muted-foreground opacity-20" />
           </div>
-        ) : (
-          filteredPackages.map((pkg) => (
-            <Card key={pkg.id} className="border-border bg-card overflow-hidden group hover:border-primary/50 transition-all duration-300 shadow-sm">
-              <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
-                <div className="flex flex-col">
-                  <span className="text-xs font-mono font-bold text-primary tracking-widest">{pkg.id}</span>
-                  {user?.role === "Admin Agence" && (
-                    <span className="text-[8px] uppercase font-bold text-muted-foreground mt-0.5 tracking-tighter">Site: {branches.find(b => b.id === pkg.branchId)?.name || "Siège"}</span>
-                  )}
-                </div>
-                {getStatusBadge(pkg.status)}
-              </div>
-              <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4 border-b border-border/50 pb-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Expéditeur</p>
-                    <p className="text-sm font-bold text-foreground truncate">{pkg.sender}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Destinataire</p>
-                    <p className="text-sm font-bold text-foreground truncate">{pkg.receiver}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
-                  <MapPin size={12} className="text-primary/70" /> {pkg.route}
-                </div>
-                <div className="pt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/5 px-2 py-1 rounded-md border border-emerald-500/10">
-                    <ShieldCheck size={14} /> {pkg.otp}
-                  </div>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-border bg-muted/50 hover:bg-primary hover:text-primary-foreground font-bold transition-all">
-                    <QrCode size={12} /> ÉTIQUETTE
-                  </Button>
-                </div>
-              </CardContent>
+          <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">Aucun colis correspondant</p>
+          <Button variant="link" onClick={() => setShowArchived(true)} className="text-primary mt-2">Consulter les archives ?</Button>
+        </div>
+      ) : (
+        <>
+          {displayMode === "table" ? (
+            /* VUE TABLEAU (Par Défaut) */
+            <Card className="border-border bg-card shadow-sm overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border">
+                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Colis ID</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Expéditeur / Dest.</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Itinéraire</TableHead>
+                    {user?.role === "Admin Agence" && <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provenance</TableHead>}
+                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Statut</TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPackages.map((pkg) => (
+                    <TableRow key={pkg.id} className="hover:bg-muted/30 border-border transition-colors group">
+                      <TableCell className="font-mono text-[11px] font-bold text-primary tracking-tighter">{pkg.id}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-bold text-foreground leading-none">{pkg.sender}</span>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                            <ChevronRight size={10} className="text-primary" /> {pkg.receiver}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
+                          <MapPin size={12} className="text-primary/60" /> {pkg.route}
+                        </div>
+                      </TableCell>
+                      {user?.role === "Admin Agence" && (
+                        <TableCell>
+                          <Badge variant="outline" className="text-[8px] uppercase font-bold border-border bg-muted/50 text-muted-foreground">
+                            {branches.find(b => b.id === pkg.branchId)?.name || "Siège Social"}
+                          </Badge>
+                        </TableCell>
+                      )}
+                      <TableCell>{getStatusBadge(pkg.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10">
+                          <ShieldCheck size={12} /> {pkg.otp}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
-          ))
-        )}
-      </div>
+          ) : (
+            /* VUE GRILLE */
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredPackages.map((pkg) => (
+                <Card key={pkg.id} className="border-border bg-card overflow-hidden group hover:border-primary/50 transition-all duration-300 shadow-sm">
+                  <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-mono font-bold text-primary tracking-widest">{pkg.id}</span>
+                      {user?.role === "Admin Agence" && (
+                        <span className="text-[8px] uppercase font-bold text-muted-foreground mt-0.5 tracking-tighter">Site: {branches.find(b => b.id === pkg.branchId)?.name || "Siège"}</span>
+                      )}
+                    </div>
+                    {getStatusBadge(pkg.status)}
+                  </div>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4 border-b border-border/50 pb-4">
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Expéditeur</p>
+                        <p className="text-sm font-bold text-foreground truncate">{pkg.sender}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Destinataire</p>
+                        <p className="text-sm font-bold text-foreground truncate">{pkg.receiver}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium">
+                      <MapPin size={12} className="text-primary/70" /> {pkg.route}
+                    </div>
+                    <div className="pt-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/5 px-2 py-1 rounded-md border border-emerald-500/10">
+                        <ShieldCheck size={14} /> {pkg.otp}
+                      </div>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-border bg-muted/50 hover:bg-primary hover:text-primary-foreground font-bold transition-all">
+                        <QrCode size={12} /> ÉTIQUETTE
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px] bg-card border-border shadow-2xl">
@@ -259,10 +378,22 @@ export default function ColisPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="phoneReceiver" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Tél. Destinataire</FormLabel><FormControl><Input placeholder="+243..." {...field} className="bg-muted/30 border-border font-mono" /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Tél. Destinataire</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+243..." {...field} className="bg-muted/30 border-border font-mono" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="route" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Itinéraire</FormLabel><FormControl><Input placeholder="Goma → Bukavu" {...field} className="bg-muted/30 border-border" /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Itinéraire</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Goma → Bukavu" {...field} className="bg-muted/30 border-border" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="description" render={({ field }) => (
