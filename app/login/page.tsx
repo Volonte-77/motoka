@@ -23,8 +23,10 @@ export default function LoginPage() {
 
   const roleOptions = [
     { value: "Admin Agence", label: "Administrateur d'Agence" },
+    { value: "Admin Succursale", label: "Administrateur Succursale" },
     { value: "Super Admin SaaS", label: "Super Administrateur SaaS" },
-    { value: "Dispatcher / Opérateur", label: "Dispatcher / Guichetier" },
+    { value: "Dispatcher", label: "Dispatcher / Guichetier" },
+    { value: "Comptable", label: "Comptable" },
     { value: "Chauffeur", label: "Chauffeur / Conducteur" },
     { value: "Client", label: "Client Agence" },
   ];
@@ -65,6 +67,7 @@ export default function LoginPage() {
       email: cleanEmail,
       role,
       agencyId: "AGE-001",
+      branchId: null,
       siteAccess: role === "Chauffeur" ? "Véhicule" : "Agence Principale",
     };
 

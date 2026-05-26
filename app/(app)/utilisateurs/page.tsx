@@ -76,7 +76,7 @@ export default function UtilisateursPage() {
     setLoading(true);
     
     const [userData, branchData] = await Promise.all([
-      localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [],
+      (await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST)) || [],
       mockApi.agencies.getBranches(currentUser.agencyId)
     ]);
     
