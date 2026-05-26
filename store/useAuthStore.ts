@@ -57,6 +57,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     set({ user: null, syncQueue: [] });
     await localforage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    // CLEAR COOKIE POUR LE MIDDLEWARE
+    document.cookie = "motoka_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   },
 
   // ========================================================================

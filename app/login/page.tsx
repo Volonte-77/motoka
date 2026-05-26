@@ -61,6 +61,9 @@ export default function LoginPage() {
     const existingUser = await mockApi.auth.login(cleanEmail, role);
 
     if (existingUser) {
+      // SET COOKIE POUR LE MIDDLEWARE
+      document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(existingUser))}; path=/; max-age=86400`; // 24h
+      
       await login(existingUser);
       const homeRoute = getHomeRouteByRole(existingUser.role);
       router.push(homeRoute);
@@ -78,6 +81,9 @@ export default function LoginPage() {
       branchId: null,
       siteAccess: "Demo Mode",
     };
+
+    // SET COOKIE POUR LE MIDDLEWARE
+    document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(demoSession))}; path=/; max-age=86400`; // 24h
 
     await login(demoSession);
     const homeRoute = getHomeRouteByRole(demoSession.role);
