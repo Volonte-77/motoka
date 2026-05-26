@@ -1,11 +1,26 @@
 import localforage from "localforage";
-import { STORAGE_KEYS, Vehicle, AppUser, Trip, Package, CashTransaction, Agency, Branch } from "@/types";
+import { STORAGE_KEYS, Vehicle, AppUser, Trip, Package, CashTransaction, Agency, Branch, SessionUser, UserRole } from "@/types";
 
 /**
  * Service de simulation API utilisant localforage
  * Permet de manipuler les données en attendant le backend réel.
  */
 export const mockApi = {
+  // --- AUTHENTIFICATION ---
+  auth: {
+    login: async (email: string, role: UserRole): Promise<SessionUser | null> => {
+      const users = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+      const found = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.role === role);
+      
+      if (found) {
+        // Retourne la session basée sur l'utilisateur trouvé en BDD
+        const { password, ...sessionData } = found;
+        return sessionData as SessionUser;
+      }
+      return null;
+    }
+  },
+
   // --- AGENCES & SUCCURSALES ---
   agencies: {
     getAll: async () => {

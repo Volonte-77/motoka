@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/useAuthStore";
 import { SessionUser, UserRole } from "@/types";
 import { defaultSuperAdmin, defaultSuperAdminPassword, backupSuperAdmin, backupSuperAdminPassword } from "@/components/saas-mock";
+import { mockApi } from "@/lib/mock-api";
 import { Combobox } from "@/components/ui/combobox";
 import { getHomeRouteByRole } from "@/lib/routing-middleware";
 import { Logo } from "@/components/logo";
@@ -40,40 +41,46 @@ export default function LoginPage() {
 
     console.log("Tentative de connexion:", { cleanEmail, role });
 
-    // Validation pour le Super Admin (simulation multi-comptes)
+    // 1. Priorité au Super Admin
     if (role === "Super Admin SaaS") {
       let authenticatedUser: SessionUser | null = null;
-
-      if (cleanEmail === defaultSuperAdmin.email && cleanPassword === defaultSuperAdminPassword) {
-        authenticatedUser = defaultSuperAdmin;
-      } else if (cleanEmail === backupSuperAdmin.email && cleanPassword === backupSuperAdminPassword) {
-        authenticatedUser = backupSuperAdmin;
-      }
+      if (cleanEmail === defaultSuperAdmin.email && cleanPassword === defaultSuperAdminPassword) authenticatedUser = defaultSuperAdmin;
+      else if (cleanEmail === backupSuperAdmin.email && cleanPassword === backupSuperAdminPassword) authenticatedUser = backupSuperAdmin;
 
       if (!authenticatedUser) {
-        setErrorMessage("Identifiants Super Admin incorrects. Utilisez admin@motoka.com / admin123");
+        setErrorMessage("Identifiants Super Admin incorrects.");
         return;
       }
-
       await login(authenticatedUser);
       router.push("/super-admin");
       return;
     }
 
-    // Connexion normale pour les autres rôles
-    const userSession: SessionUser = {
-      id: `user-${Date.now()}`,
-      name: cleanEmail.split("@")[0] || "Utilisateur",
+    // 2. Vérification dans la base de données réelle (Mocks localforage)
+    // Cela permet aux utilisateurs créés dans la page "Utilisateurs" de se connecter
+    const existingUser = await mockApi.auth.login(cleanEmail, role);
+
+    if (existingUser) {
+      await login(existingUser);
+      const homeRoute = getHomeRouteByRole(existingUser.role);
+      router.push(homeRoute);
+      return;
+    }
+
+    // 3. Fallback : Demo Mode (pour tester sans avoir créé de compte au préalable)
+    // On crée une session temporaire pour ne pas bloquer le dev
+    const demoSession: SessionUser = {
+      id: `demo-${Date.now()}`,
+      name: cleanEmail.split("@")[0] || "Demo User",
       email: cleanEmail,
       role,
       agencyId: "AGE-001",
       branchId: null,
-      siteAccess: role === "Chauffeur" ? "Véhicule" : "Agence Principale",
+      siteAccess: "Demo Mode",
     };
 
-    await login(userSession);
-
-    const homeRoute = getHomeRouteByRole(userSession.role);
+    await login(demoSession);
+    const homeRoute = getHomeRouteByRole(demoSession.role);
     router.push(homeRoute);
   };
 
