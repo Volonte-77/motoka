@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Car, Package, Users, Settings, 
   LogOut, Menu, Wallet, ShieldAlert, BarChart3, User,
-  Building2, CreditCard, Activity, X
+  Building2, CreditCard, Activity, X,
+  Key
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { Button } from "./ui/button";
 
 // Liste de navigation enrichie avec les restrictions de rôles (RBAC)
 const navigationItems = [
