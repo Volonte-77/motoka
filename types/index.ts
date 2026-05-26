@@ -12,6 +12,7 @@
 export type UserRole = 
   | "Super Admin SaaS"
   | "Admin Agence"
+  | "Admin Succursale"
   | "Dispatcher / Opérateur"
   | "Chauffeur"
   | "Client";
@@ -39,6 +40,7 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   agencyId: string | null;        // null = SuperAdmin (vue globale), sinon ID agence
+  branchId: string | null;        // null = Vue globale agence ou SuperAdmin
   siteAccess: string;              // "Global" ou nom du site spécifique
   driverId?: string;               // Si Chauffeur assigné
   clientId?: string;               // Si Client agence
@@ -58,7 +60,7 @@ export interface AppUser extends SessionUser {
 }
 
 // ============================================================================
-// AGENCES & PLAN DE SOUSCRIPTION
+// AGENCES & SUCCURSALES
 // ============================================================================
 
 export interface Agency {
@@ -70,7 +72,18 @@ export interface Agency {
   status: SubscriptionStatus;
   expiresAt: string;
   createdAt: string;
-  branches?: string[];             // Multi-sites selon le plan
+  logo?: string;
+}
+
+export interface Branch {
+  id: string;
+  agencyId: string;
+  name: string;
+  city: string;
+  address: string;
+  phone: string;
+  managerId?: string;
+  createdAt: string;
 }
 
 // ============================================================================
@@ -87,6 +100,7 @@ export interface Vehicle {
   mileage: string;
   lastService: string;
   agencyId: string;                // Cloisonnement: propriétaire agence
+  branchId: string | null;         // Assignation à une succursale spécifique
 }
 
 // ============================================================================
@@ -106,6 +120,7 @@ export interface Trip {
   passengers: number;
   load: string;                    // Description du fret
   agencyId: string;                // Cloisonnement multi-agence
+  branchId: string | null;         // Succursale de départ
 }
 
 // ============================================================================
@@ -124,6 +139,7 @@ export interface Package {
   value: string;
   otp: string;                     // One-Time Password pour vérification à la livraison
   agencyId: string;                // Cloisonnement multi-agence
+  branchId: string | null;         // Succursale d'enregistrement
   tripId?: string;                 // Lien optionnel avec la course transportant le colis
 }
 
@@ -139,6 +155,7 @@ export interface CashTransaction {
   category: CashCategory;
   timestamp: string;
   agencyId: string;                // Cloisonnement multi-agence
+  branchId: string | null;         // Succursale concernée
   userId?: string;                 // Qui a enregistré la transaction
 }
 
@@ -150,8 +167,9 @@ export const STORAGE_KEYS = {
   // Auth & Session
   CURRENT_SESSION: "motoka_current_session",
   
-  // Agences (SaaS Admin)
+  // Agences & Succursales (SaaS Admin)
   AGENCIE_LIST: "saas_agencies_data",
+  BRANCH_LIST: "motoka_branches_data",
   
   // Utilisateurs
   USERS_LIST: "motoka_users_data",
@@ -194,6 +212,7 @@ export interface ApiResponse<T = any> {
  */
 export interface TenantContext {
   agencyId: string | null;         // null = SuperAdmin (vue globale)
+  branchId: string | null;         // null = Vue globale agence
   userId: string;
   role: UserRole;
 }

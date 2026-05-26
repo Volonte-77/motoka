@@ -1,17 +1,29 @@
 import localforage from "localforage";
-import { STORAGE_KEYS, Vehicle, AppUser, Trip, Package, CashTransaction } from "@/types";
+import { STORAGE_KEYS, Vehicle, AppUser, Trip, Package, CashTransaction, Agency, Branch } from "@/types";
 
 /**
  * Service de simulation API utilisant localforage
  * Permet de manipuler les données en attendant le backend réel.
  */
 export const mockApi = {
+  // --- AGENCES & SUCCURSALES ---
+  agencies: {
+    getAll: async () => {
+      return await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
+    },
+    getBranches: async (agencyId: string) => {
+      const data = await localforage.getItem<Branch[]>(STORAGE_KEYS.BRANCH_LIST) || [];
+      return data.filter(b => b.agencyId === agencyId);
+    }
+  },
+
   // --- VÉHICULES ---
   vehicles: {
-    getAll: async (agencyId: string | null) => {
-      const data = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
-      if (!agencyId) return data;
-      return data.filter(v => v.agencyId === agencyId);
+    getAll: async (agencyId: string | null, branchId: string | null = null) => {
+      let data = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
+      if (agencyId) data = data.filter(v => v.agencyId === agencyId);
+      if (branchId) data = data.filter(v => v.branchId === branchId);
+      return data;
     },
     save: async (vehicle: Vehicle) => {
       const data = await localforage.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES_LIST) || [];
@@ -30,11 +42,12 @@ export const mockApi = {
 
   // --- CHAUFFEURS (Utilisateurs avec rôle Chauffeur) ---
   drivers: {
-    getAll: async (agencyId: string | null) => {
+    getAll: async (agencyId: string | null, branchId: string | null = null) => {
       const data = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-      const drivers = data.filter(u => u.role === "Chauffeur");
-      if (!agencyId) return drivers;
-      return drivers.filter(u => u.agencyId === agencyId);
+      let drivers = data.filter(u => u.role === "Chauffeur");
+      if (agencyId) drivers = drivers.filter(u => u.agencyId === agencyId);
+      if (branchId) drivers = drivers.filter(u => u.branchId === branchId);
+      return drivers;
     },
     save: async (driver: AppUser) => {
       const data = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
@@ -48,10 +61,11 @@ export const mockApi = {
 
   // --- COURSES (TRIPS) ---
   trips: {
-    getAll: async (agencyId: string | null) => {
-      const data = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
-      if (!agencyId) return data;
-      return data.filter(t => t.agencyId === agencyId);
+    getAll: async (agencyId: string | null, branchId: string | null = null) => {
+      let data = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
+      if (agencyId) data = data.filter(t => t.agencyId === agencyId);
+      if (branchId) data = data.filter(t => t.branchId === branchId);
+      return data;
     },
     save: async (trip: Trip) => {
       const data = await localforage.getItem<Trip[]>(STORAGE_KEYS.TRIPS_LIST) || [];
@@ -65,10 +79,11 @@ export const mockApi = {
 
   // --- COLIS (PACKAGES) ---
   packages: {
-    getAll: async (agencyId: string | null) => {
-      const data = await localforage.getItem<Package[]>(STORAGE_KEYS.PACKAGES_LIST) || [];
-      if (!agencyId) return data;
-      return data.filter(p => p.agencyId === agencyId);
+    getAll: async (agencyId: string | null, branchId: string | null = null) => {
+      let data = await localforage.getItem<Package[]>(STORAGE_KEYS.PACKAGES_LIST) || [];
+      if (agencyId) data = data.filter(p => p.agencyId === agencyId);
+      if (branchId) data = data.filter(p => p.branchId === branchId);
+      return data;
     },
     save: async (pkg: Package) => {
       const data = await localforage.getItem<Package[]>(STORAGE_KEYS.PACKAGES_LIST) || [];
@@ -82,10 +97,11 @@ export const mockApi = {
 
   // --- CAISSE (TRANSACTIONS) ---
   cash: {
-    getAll: async (agencyId: string | null) => {
-      const data = await localforage.getItem<CashTransaction[]>(STORAGE_KEYS.CASH_TRANSACTIONS) || [];
-      if (!agencyId) return data;
-      return data.filter(t => t.agencyId === agencyId);
+    getAll: async (agencyId: string | null, branchId: string | null = null) => {
+      let data = await localforage.getItem<CashTransaction[]>(STORAGE_KEYS.CASH_TRANSACTIONS) || [];
+      if (agencyId) data = data.filter(t => t.agencyId === agencyId);
+      if (branchId) data = data.filter(t => t.branchId === branchId);
+      return data;
     },
     save: async (transaction: CashTransaction) => {
       const data = await localforage.getItem<CashTransaction[]>(STORAGE_KEYS.CASH_TRANSACTIONS) || [];

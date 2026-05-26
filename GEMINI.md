@@ -24,27 +24,26 @@ Motoka is a "Mobile First" web application designed to digitize and centralize t
 
 ## Architecture & Conventions
 
-### Directory Structure
-- `app/`: Next.js App Router routes.
-  - `(app)/`: Main application routes (Dashboard, Drivers, Vehicles, etc.) protected by auth.
-  - `admin/saas/`: SaaS administration.
-  - `login/`: Authentication entry point.
-- `components/`: UI components.
-  - `ui/`: Shared shadcn/ui components.
-  - `navigation-shell.tsx`: Main layout wrapper with RBAC-aware sidebar.
-- `context/`: React Context providers (Auth).
-- `hooks/`: Custom React hooks (e.g., `useAuthGuard`).
-- `lib/`: Utility functions and Mock API.
-  - `mock-api.ts`: Simulation service using `localforage`.
-- `store/`: Zustand stores for global state.
-- `types/`: TypeScript definitions.
+### Hierarchical Multi-tenancy
+Motoka uses a deep multi-tenant structure to support large organizations:
+1.  **Level 1: Super Admin SaaS**: Global overview across all agencies.
+2.  **Level 2: Agency (Agence)**: Isolated logical entity. Each agency has its own branding, users, and settings.
+3.  **Level 3: Branch (Succursale)**: Sub-entities within an agency. Data (vehicles, trips, packages) can be scoped to a specific branch.
 
-### Development Guidelines
-- **Mobile First**: Prioritize mobile responsiveness for all UI components.
-- **RBAC**: Navigation and access are controlled via roles defined in `navigation-shell.tsx` and handled in `useAuthStore`.
-  - Roles: `Super Admin SaaS`, `Admin Agence`, `Dispatcher / Opérateur`, `Chauffeur`, `Client`.
-- **Offline First**: Use `localforage` via `mockApi` for data persistence to ensure functionality without a stable backend connection.
-- **Type Safety**: Strictly use TypeScript interfaces defined in `types/index.ts`.
+### Role-Based Access Control (RBAC)
+- **Super Admin SaaS**: Full system access.
+- **Admin Agence**: Full access to agency-wide data and branch management.
+- **Admin Succursale**: Access to data scoped to their specific branch.
+- **Dispatcher / Opérateur**: Daily operations (trips, packages) within a branch or agency.
+- **Chauffeur**: Access to assigned trips and personal profile.
+- **Client**: Access to package tracking and history.
+
+### Data Scoping Rules
+- All operational entities (`Vehicle`, `Trip`, `Package`, `CashTransaction`) MUST include `agencyId`.
+- Operational entities SHOULD include `branchId` if they are specific to a branch.
+- Global agency views (accessible by `Admin Agence`) should filter by `agencyId`.
+- Branch-specific views (accessible by `Admin Succursale`) should filter by both `agencyId` and `branchId`.
+- Filtering logic is centralized in `mock-api.ts` and managed via `useAuthStore`.
 
 ## Build & Run Commands
 

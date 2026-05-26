@@ -15,7 +15,8 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
   login: (userSession: SessionUser) => Promise<void>;
   logout: () => Promise<void>;
-  switchAgency: (agencyId: string) => Promise<void>;  // Pour SuperAdmin
+  switchAgency: (agencyId: string | null) => Promise<void>;  // Pour SuperAdmin
+  switchBranch: (branchId: string | null) => Promise<void>;  // Pour Admin Agence
   setOfflineStatus: (offline: boolean) => void;
   addToSyncQueue: (action: any) => void;
   clearSyncQueue: () => void;
@@ -61,7 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ========================================================================
   // CHANGEMENT D'AGENCE (SuperAdmin uniquement)
   // ========================================================================
-  switchAgency: async (agencyId: string) => {
+  switchAgency: async (agencyId: string | null) => {
     const { user } = get();
     if (!user || user.role !== "Super Admin SaaS") {
       console.warn("Seul le Super Admin peut changer d'agence");
@@ -70,7 +71,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const updatedUser: SessionUser = {
       ...user,
-      agencyId, // null reste null pour SuperAdmin, ou peut switch de vue
+      agencyId, 
+      branchId: null, // Reset de la succursale lors du changement d'agence
+    };
+
+    await set({ user: updatedUser });
+    await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, updatedUser);
+  },
+
+  // ========================================================================
+  // CHANGEMENT DE SUCCURSALE (Admin Agence uniquement)
+  // ========================================================================
+  switchBranch: async (branchId: string | null) => {
+    const { user } = get();
+    if (!user || (user.role !== "Admin Agence" && user.role !== "Super Admin SaaS")) {
+      console.warn("Permission insuffisante pour changer de succursale");
+      return;
+    }
+
+    const updatedUser: SessionUser = {
+      ...user,
+      branchId,
     };
 
     await set({ user: updatedUser });
