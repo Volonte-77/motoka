@@ -15,14 +15,14 @@ import { Logo } from "@/components/logo";
 // Liste de navigation enrichie avec les restrictions de rôles (RBAC)
 const navigationItems = [
   // --- ESPACE AGENCE / SUCCURSALE ---
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["Admin Agence", "Admin Succursale", "Dispatcher", "Comptable"] },
   { name: "Succursales", href: "/succursales", icon: Building2, roles: ["Admin Agence"] },
-  { name: "Chauffeurs", href: "/chauffeurs", icon: Users, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
-  { name: "Véhicules", href: "/vehicules", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
-  { name: "Courses", href: "/courses", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur", "Chauffeur"] },
-  { name: "Colis", href: "/colis", icon: Package, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur", "Client"] },
-  { name: "Caisse", href: "/caisse", icon: Wallet, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
-  { name: "Rapports", href: "/rapports", icon: BarChart3, roles: ["Admin Agence", "Admin Succursale"] }, 
+  { name: "Chauffeurs", href: "/chauffeurs", icon: Users, roles: ["Admin Agence", "Admin Succursale", "Dispatcher"] },
+  { name: "Véhicules", href: "/vehicules", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher"] },
+  { name: "Courses", href: "/courses", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher", "Chauffeur"] },
+  { name: "Colis", href: "/colis", icon: Package, roles: ["Admin Agence", "Admin Succursale", "Dispatcher", "Client"] },
+  { name: "Caisse", href: "/caisse", icon: Wallet, roles: ["Admin Agence", "Admin Succursale", "Dispatcher", "Comptable"] },
+  { name: "Rapports", href: "/rapports", icon: BarChart3, roles: ["Admin Agence", "Admin Succursale", "Comptable"] }, 
   { name: "Utilisateurs", href: "/utilisateurs", icon: Users, roles: ["Admin Agence", "Admin Succursale"] },
 
   // --- ESPACE SUPER ADMIN SaaS ---
@@ -32,7 +32,7 @@ const navigationItems = [
   { name: "Logs Système", href: "/super-admin/logs", icon: Activity, roles: ["Super Admin SaaS"] },
 
   // --- COMMUN ---
-  { name: "Paramètres", href: "/settings", icon: Settings, roles: ["Super Admin SaaS", "Admin Agence", "Admin Succursale", "Dispatcher / Opérateur", "Chauffeur"] },
+  { name: "Paramètres", href: "/settings", icon: Settings, roles: ["Super Admin SaaS", "Admin Agence", "Admin Succursale", "Dispatcher", "Chauffeur", "Comptable"] },
 ];
 
 export default function NavigationShell({ children }: { children: React.ReactNode }) {

@@ -16,8 +16,10 @@ import { NextRequest, NextResponse } from "next/server";
 // Cartographie des rôles vers leurs routes autorisées
 const ROLE_ROUTES: Record<string, string[]> = {
   "Super Admin SaaS": ["/super-admin", "/admin"],
-  "Admin Agence": ["/dashboard", "/courses", "/colis", "/vehicules", "/chauffeurs", "/caisse", "/utilisateurs", "/settings", "/rapports"],
-  "Dispatcher / Opérateur": ["/dashboard", "/courses", "/colis", "/vehicules", "/chauffeurs", "/caisse"],
+  "Admin Agence": ["/dashboard", "/courses", "/colis", "/vehicules", "/chauffeurs", "/caisse", "/utilisateurs", "/settings", "/rapports", "/succursales"],
+  "Admin Succursale": ["/dashboard", "/courses", "/colis", "/vehicules", "/chauffeurs", "/caisse", "/utilisateurs", "/settings", "/rapports"],
+  "Dispatcher": ["/dashboard", "/courses", "/colis", "/vehicules", "/chauffeurs", "/caisse"],
+  "Comptable": ["/dashboard", "/caisse", "/rapports", "/settings"],
   "Chauffeur": ["/courses"],
   "Client": ["/client"],
 };
@@ -33,9 +35,10 @@ export function getHomeRouteByRole(role: string | undefined): string {
     case "Super Admin SaaS":
       return "/super-admin";
     case "Admin Agence":
+    case "Admin Succursale":
+    case "Dispatcher":
+    case "Comptable":
       return "/dashboard";
-    case "Dispatcher / Opérateur":
-      return "/courses";
     case "Chauffeur":
       return "/courses";
     case "Client":
