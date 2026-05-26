@@ -1,18 +1,18 @@
-"use client";
-
-import { useEffect } from "react";
-import { useAuthStore } from "@/store/useAuthStore";
+import { Metadata } from "next";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+import ClientInitializer from "@/components/client-initializer";
+
+export const metadata: Metadata = {
+  title: "Motoka — Gestion d'Agence de Transport",
+  description: "Plateforme SaaS de gestion intelligente pour agences de transport et logistique.",
+  icons: {
+    icon: "/favicon.ico",
+  },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const initializeAuth = useAuthStore((state) => state.initializeAuth);
-
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
-
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="bg-zinc-50 dark:bg-[#09090b] text-zinc-950 dark:text-zinc-50 transition-colors duration-200 antialiased">
@@ -22,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <ClientInitializer>
+            {children}
+          </ClientInitializer>
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
       </body>
