@@ -34,22 +34,28 @@ export function useAuthGuard(
 
     // Pas d'utilisateur : rediriger vers login
     if (!user) {
+      console.log("[useAuthGuard] Pas d'utilisateur, redirection vers /login");
       router.push("/login");
       return;
     }
 
-    // Vérifier le rôle si requis
+    // --- LOGIQUE DE VALIDATION DES RÔLES ---
+    let isAllowed = true;
+
+    // 1. Vérifier requiredRole (exclusif)
     if (requiredRole && user.role !== requiredRole) {
-      const homeRoute = getHomeRouteByRole(user.role);
-      router.push(homeRoute);
-      return;
+      isAllowed = false;
     }
 
-    // Vérifier dans le tableau de rôles autorisés
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // 2. Vérifier allowedRoles (inclusif)
+    if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+      isAllowed = false;
+    }
+
+    if (!isAllowed) {
       const homeRoute = getHomeRouteByRole(user.role);
+      console.warn(`[useAuthGuard] Rôle ${user.role} non autorisé. Redirection vers ${homeRoute}`);
       router.push(homeRoute);
-      return;
     }
   }, [user, loading, requiredRole, allowedRoles, router]);
 

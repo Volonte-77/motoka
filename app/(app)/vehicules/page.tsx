@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Search, MoreHorizontal, Trash2, Edit2, Car } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
-import { Vehicle, VehicleStatus } from "@/types";
+import { Vehicle, VehicleStatus, Branch } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +49,7 @@ const vehicleSchema = z.object({
   owner: z.string().min(2, "Le propriétaire est requis"),
   mileage: z.string().min(1, "Le kilométrage est requis"),
   lastService: z.string().min(1, "La date du dernier entretien est requise"),
+  branchId: z.string().optional(),
 });
 
 type VehicleFormValues = z.infer<typeof vehicleSchema>;
@@ -56,6 +57,7 @@ type VehicleFormValues = z.infer<typeof vehicleSchema>;
 export default function VehiculesPage() {
   const { user } = useAuthStore();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -71,32 +73,41 @@ export default function VehiculesPage() {
       owner: "Agence Interne",
       mileage: "0",
       lastService: new Date().toISOString().split("T")[0],
+      branchId: "global",
     },
   });
 
-  const loadVehicles = async () => {
+  const loadData = async () => {
     setLoading(true);
-    // Simulation délai réseau
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const data = await mockApi.vehicles.getAll(user?.agencyId || null);
-    setVehicles(data);
+    const agencyId = user?.agencyId || null;
+    const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
+
+    const [vehiclesData, branchesData] = await Promise.all([
+      mockApi.vehicles.getAll(agencyId, branchId),
+      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
+    ]);
+    
+    setVehicles(vehiclesData);
+    setBranches(branchesData);
     setLoading(false);
   };
 
   useEffect(() => {
-    loadVehicles();
-  }, [user?.agencyId]);
+    loadData();
+  }, [user?.agencyId, user?.branchId, user?.role]);
 
   const onSubmit = async (values: VehicleFormValues) => {
     try {
+      const { branchId, ...rest } = values;
       const vehicleData: Vehicle = {
         id: editingVehicle?.id || Math.random().toString(36).substr(2, 9),
-        ...values,
+        ...rest,
         agencyId: user?.agencyId || "default-agency",
+        branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
       };
 
       await mockApi.vehicles.save(vehicleData);
-      await loadVehicles();
+      await loadData();
       setIsDialogOpen(false);
       setEditingVehicle(null);
       form.reset();
@@ -116,6 +127,7 @@ export default function VehiculesPage() {
       owner: vehicle.owner,
       mileage: vehicle.mileage,
       lastService: vehicle.lastService,
+      branchId: vehicle.branchId || "global",
     });
     setIsDialogOpen(true);
   };
@@ -124,7 +136,7 @@ export default function VehiculesPage() {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce véhicule ?")) {
       try {
         await mockApi.vehicles.delete(id);
-        await loadVehicles();
+        await loadData();
         toast.success("Véhicule supprimé");
       } catch (error) {
         toast.error("Erreur lors de la suppression");
@@ -158,13 +170,28 @@ export default function VehiculesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">Véhicules</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez le parc automobile de votre agence.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
+            {user?.role === "Admin Succursale" ? "Parc Automobile Local" : "Véhicules de l'Agence"}
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {user?.role === "Admin Succursale" 
+              ? "Gérez les véhicules affectés à votre succursale." 
+              : "Gérez l'ensemble de votre flotte à travers toutes les branches."}
+          </p>
         </div>
         <Button 
           onClick={() => {
             setEditingVehicle(null);
-            form.reset();
+            form.reset({
+              model: "",
+              plate: "",
+              type: "Bus",
+              status: "Disponible",
+              owner: "Agence Interne",
+              mileage: "0",
+              lastService: new Date().toISOString().split("T")[0],
+              branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global",
+            });
             setIsDialogOpen(true);
           }}
           className="bg-primary hover:bg-primary/90 text-white"
@@ -196,8 +223,8 @@ export default function VehiculesPage() {
               <TableHead>Véhicule</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Plaque</TableHead>
+              {user?.role === "Admin Agence" && <TableHead>Affectation</TableHead>}
               <TableHead>Statut</TableHead>
-              <TableHead className="hidden md:table-cell">Kilométrage</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -208,14 +235,14 @@ export default function VehiculesPage() {
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  {user?.role === "Admin Agence" && <TableCell><Skeleton className="h-5 w-24" /></TableCell>}
                   <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-16" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-10 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : filteredVehicles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-zinc-500">
+                <TableCell colSpan={user?.role === "Admin Agence" ? 6 : 5} className="h-32 text-center text-zinc-500">
                   Aucun véhicule trouvé.
                 </TableCell>
               </TableRow>
@@ -227,13 +254,22 @@ export default function VehiculesPage() {
                       <div className="p-2 rounded-md bg-zinc-100 dark:bg-zinc-800">
                         <Car size={16} className="text-zinc-500" />
                       </div>
-                      {vehicle.model}
+                      <div className="flex flex-col">
+                        <span>{vehicle.model}</span>
+                        <span className="text-[10px] text-zinc-500 uppercase font-mono">{vehicle.owner}</span>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-zinc-500">{vehicle.type}</TableCell>
+                  <TableCell className="text-zinc-500 text-xs">{vehicle.type}</TableCell>
                   <TableCell className="font-mono text-xs font-bold tracking-wider">{vehicle.plate}</TableCell>
+                  {user?.role === "Admin Agence" && (
+                    <TableCell>
+                      <Badge variant="outline" className="text-[9px] uppercase font-bold border-zinc-200 dark:border-zinc-800">
+                        {branches.find(b => b.id === vehicle.branchId)?.name || "Siège Social"}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
-                  <TableCell className="hidden md:table-cell text-zinc-500">{vehicle.mileage} km</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(vehicle)} className="h-8 w-8 hover:bg-zinc-100 dark:hover:bg-zinc-800">
@@ -255,11 +291,11 @@ export default function VehiculesPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-zinc-900 dark:text-white">
+            <DialogTitle className="text-zinc-900 dark:text-white font-bold">
               {editingVehicle ? "Modifier le véhicule" : "Ajouter un véhicule"}
             </DialogTitle>
             <DialogDescription>
-              Remplissez les informations ci-dessous pour {editingVehicle ? "mettre à jour" : "enregistrer"} le véhicule.
+              Informations techniques et affectation géographique.
             </DialogDescription>
           </DialogHeader>
 
@@ -346,13 +382,25 @@ export default function VehiculesPage() {
 
               <FormField
                 control={form.control}
-                name="owner"
+                name="branchId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Propriétaire</FormLabel>
+                    <FormLabel>Affectation Géographique</FormLabel>
                     <FormControl>
-                      <Input {...field} className="bg-zinc-50 dark:bg-zinc-900" />
+                      <Combobox
+                        options={[
+                          { value: "global", label: "Siège Social / Agence" },
+                          ...branches.map(b => ({ value: b.id, label: b.name }))
+                        ]}
+                        value={field.value || "global"}
+                        onChange={field.onChange}
+                        placeholder="Affecter à une succursale"
+                        disabled={user?.role === "Admin Succursale"}
+                      />
                     </FormControl>
+                    {user?.role === "Admin Succursale" && (
+                      <p className="text-[10px] text-zinc-500 mt-1 italic">Verrouillé sur votre succursale.</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

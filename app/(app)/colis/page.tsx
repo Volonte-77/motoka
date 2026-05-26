@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Package as PackageIcon, User, Phone, MapPin, QrCode, ShieldCheck } from "lucide-react";
+import { Plus, Search, Package as PackageIcon, User, Phone, MapPin, QrCode, ShieldCheck, Building2 } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
-import { Package, PackageStatus } from "@/types";
+import { Package, PackageStatus, Branch } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "sonner";
+import { Combobox } from "@/components/ui/combobox";
 
 const packageSchema = z.object({
   sender: z.string().min(3, "Expéditeur requis"),
@@ -48,6 +49,7 @@ const packageSchema = z.object({
   weight: z.string().optional(),
   value: z.string().optional(),
   status: z.enum(["En attente", "En transit", "Livré", "Annulé"]),
+  branchId: z.string().optional(),
 });
 
 type PackageFormValues = z.infer<typeof packageSchema>;
@@ -55,6 +57,7 @@ type PackageFormValues = z.infer<typeof packageSchema>;
 export default function ColisPage() {
   const { user } = useAuthStore();
   const [packages, setPackages] = useState<Package[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,32 +73,42 @@ export default function ColisPage() {
       weight: "1kg",
       value: "0 FCFA",
       status: "En attente",
+      branchId: "global",
     },
   });
 
-  const loadPackages = async () => {
+  const loadData = async () => {
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const data = await mockApi.packages.getAll(user?.agencyId || null);
-    setPackages(data);
+    const agencyId = user?.agencyId || null;
+    const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
+
+    const [packagesData, branchesData] = await Promise.all([
+      mockApi.packages.getAll(agencyId, branchId),
+      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
+    ]);
+
+    setPackages(packagesData);
+    setBranches(branchesData);
     setLoading(false);
   };
 
   useEffect(() => {
-    loadPackages();
-  }, [user?.agencyId]);
+    loadData();
+  }, [user?.agencyId, user?.branchId, user?.role]);
 
   const onSubmit = async (values: PackageFormValues) => {
     try {
+      const { branchId, ...rest } = values;
       const pkgData: Package = {
         id: "PKG-" + Math.random().toString(36).substr(2, 6).toUpperCase(),
         otp: Math.floor(1000 + Math.random() * 9000).toString(),
         agencyId: user?.agencyId || "default-agency",
-        ...values,
+        branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
+        ...rest,
       };
 
       await mockApi.packages.save(pkgData);
-      await loadPackages();
+      await loadData();
       setIsDialogOpen(false);
       form.reset();
       toast.success(`Colis enregistré ! OTP: ${pkgData.otp}`, {
@@ -110,8 +123,8 @@ export default function ColisPage() {
   const getStatusBadge = (status: PackageStatus) => {
     switch (status) {
       case "En attente": return <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/5">En attente</Badge>;
-      case "En transit": return <Badge className="bg-blue-500 text-white">En transit</Badge>;
-      case "Livré": return <Badge className="bg-emerald-500 text-white">Livré</Badge>;
+      case "En transit": return <Badge className="bg-blue-500 text-white border-none">En transit</Badge>;
+      case "Livré": return <Badge className="bg-emerald-500 text-white border-none">Livré</Badge>;
       case "Annulé": return <Badge variant="destructive">Annulé</Badge>;
       default: return <Badge>{status}</Badge>;
     }
@@ -127,10 +140,22 @@ export default function ColisPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">Gestion des Colis</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Suivez les expéditions et livraisons de fret.</p>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white uppercase tracking-tighter">
+            {user?.role === "Admin Succursale" ? "Registre des Colis" : "Fret & Logistique"}
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {user?.role === "Admin Succursale" 
+              ? `Colis enregistrés à ${branches.find(b => b.id === user.branchId)?.name || "votre succursale"}.` 
+              : "Suivi global des expéditions de l'agence."}
+          </p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+        <Button onClick={() => {
+          form.reset({
+            sender: "", receiver: "", phoneReceiver: "", description: "", route: "", weight: "1kg", value: "0 FCFA", status: "En attente",
+            branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global"
+          });
+          setIsDialogOpen(true);
+        }} className="bg-primary text-white hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" /> Nouvel Envoi
         </Button>
       </div>
@@ -162,7 +187,12 @@ export default function ColisPage() {
           filteredPackages.map((pkg) => (
             <Card key={pkg.id} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden group hover:border-primary/50 transition-colors">
               <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
-                <span className="text-xs font-mono font-bold text-primary">{pkg.id}</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-mono font-bold text-primary">{pkg.id}</span>
+                  {user?.role === "Admin Agence" && (
+                    <span className="text-[8px] uppercase font-bold text-zinc-400 mt-0.5">Site: {branches.find(b => b.id === pkg.branchId)?.name || "Siège"}</span>
+                  )}
+                </div>
                 {getStatusBadge(pkg.status)}
               </div>
               <CardContent className="p-4 space-y-4">
@@ -177,14 +207,14 @@ export default function ColisPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <MapPin size={12} /> {pkg.route}
+                  <MapPin size={12} className="text-primary" /> {pkg.route}
                 </div>
                 <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">
                     <ShieldCheck size={14} /> OTP: {pkg.otp}
                   </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 hover:bg-primary/10 hover:text-primary">
-                    <QrCode size={12} /> Étiquette
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 hover:bg-primary/10 hover:text-primary font-bold">
+                    <QrCode size={12} /> ÉTIQUETTE
                   </Button>
                 </div>
               </CardContent>
@@ -196,42 +226,65 @@ export default function ColisPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle>Enregistrer un nouveau colis</DialogTitle>
-            <DialogDescription>Saisissez les informations d'expédition pour générer le code de suivi.</DialogDescription>
+            <DialogTitle className="font-bold text-xl">Enregistrement Fret</DialogTitle>
+            <DialogDescription>Générez un bordereau d'expédition et un code OTP.</DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="sender" render={({ field }) => (
-                  <FormItem><FormLabel>Expéditeur</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Expéditeur</FormLabel><FormControl><Input placeholder="Nom complet" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="receiver" render={({ field }) => (
-                  <FormItem><FormLabel>Destinataire</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Destinataire</FormLabel><FormControl><Input placeholder="Nom complet" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+
+              <FormField control={form.control} name="branchId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dépôt d'enregistrement</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      options={[
+                        { value: "global", label: "Agence Centrale / Siège" },
+                        ...branches.map(b => ({ value: b.id, label: b.name }))
+                      ]}
+                      value={field.value || "global"}
+                      onChange={field.onChange}
+                      placeholder="Affecter à un site"
+                      disabled={user?.role === "Admin Succursale"}
+                    />
+                  </FormControl>
+                  {user?.role === "Admin Succursale" && (
+                    <p className="text-[10px] text-zinc-500 mt-1 italic">Verrouillé sur votre dépôt local.</p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="phoneReceiver" render={({ field }) => (
-                  <FormItem><FormLabel>Tél. Destinataire</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Tél. Destinataire</FormLabel><FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="route" render={({ field }) => (
                   <FormItem><FormLabel>Itinéraire</FormLabel><FormControl><Input placeholder="Goma → Bukavu" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem><FormLabel>Description du contenu</FormLabel><FormControl><Input placeholder="Sac de farine, carton d'huile..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Contenu du colis</FormLabel><FormControl><Input placeholder="Description précise" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="weight" render={({ field }) => (
-                  <FormItem><FormLabel>Poids (Est.)</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Poids (Est.)</FormLabel><FormControl><Input placeholder="Ex: 5kg" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="value" render={({ field }) => (
-                  <FormItem><FormLabel>Valeur déclarée</FormLabel><FormControl><Input {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Valeur déclarée</FormLabel><FormControl><Input placeholder="Valeur en FCFA" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <DialogFooter className="pt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                <Button type="submit" className="bg-primary text-white">Générer Envoi</Button>
+                <Button type="submit" className="bg-primary text-white">Confirmer l'expédition</Button>
               </DialogFooter>
             </form>
           </Form>

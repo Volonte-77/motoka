@@ -6,10 +6,12 @@ import NavigationShell from "@/components/navigation-shell";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
+import { getHomeRouteByRole } from "@/lib/routing-middleware";
+
 /**
  * Layout pour l'espace Admin Agence (/app/*)
  * 
- * Autorize: Admin Agence, Dispatcher/Opérateur
+ * Autorize: Admin Agence, Admin Succursale, Dispatcher, Comptable
  * Rôles non-autorisés: redirigés vers leur espace home
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -25,18 +27,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const allowedRoles = ["Super Admin SaaS", "Admin Agence", "Dispatcher / Opérateur"];
+    const allowedRoles = ["Super Admin SaaS", "Admin Agence", "Admin Succursale", "Dispatcher", "Comptable"];
+    
     if (!allowedRoles.includes(user.role)) {
-      switch (user.role) {
-        case "Chauffeur":
-          router.push("/driver/portal");
-          break;
-        case "Client":
-          router.push("/client/space");
-          break;
-        default:
-          router.push("/login");
-      }
+      const homeRoute = getHomeRouteByRole(user.role);
+      router.push(homeRoute);
     }
   }, [user, loading, router]);
 

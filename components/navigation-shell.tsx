@@ -77,14 +77,14 @@ export default function NavigationShell({ children }: { children: React.ReactNod
 
       {/* SIDEBAR (Drawer sur mobile, Permanent sur desktop) */}
       <aside className={cn(
-        "fixed top-0 left-0 z-50 h-screen bg-white dark:bg-[#121214] border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300 flex flex-col justify-between",
+        "fixed top-0 left-0 z-50 h-screen bg-white dark:bg-[#121214] border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300 flex flex-col overflow-hidden",
         // Logique Mobile
         mobileMenuOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0",
         // Logique Desktop
         sidebarOpen ? "md:w-64" : "md:w-20"
       )}>
-        <div>
-          {/* Header Sidebar (Logo + Toggle) */}
+        {/* 1. HEADER FIXE (Logo + Profil) */}
+        <div className="flex-none bg-white dark:bg-[#121214] z-10">
           <div className={cn(
             "p-4 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 h-16 transition-all duration-200",
             !sidebarOpen && "md:justify-center"
@@ -100,7 +100,6 @@ export default function NavigationShell({ children }: { children: React.ReactNod
               />
             </div>
             
-            {/* Bouton fermeture (Desktop) */}
             <button 
               onClick={() => setSidebarOpen(false)}
               className="hidden md:flex p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer ml-auto"
@@ -109,7 +108,6 @@ export default function NavigationShell({ children }: { children: React.ReactNod
               <Menu size={18} />
             </button>
 
-            {/* Bouton fermeture (Mobile) */}
             <button 
               onClick={() => setMobileMenuOpen(false)}
               className="md:hidden p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 cursor-pointer"
@@ -118,17 +116,21 @@ export default function NavigationShell({ children }: { children: React.ReactNod
             </button>
           </div>
 
-          {/* Profil */}
-          <div className={cn("p-3 mx-2 mt-3 border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-xl space-y-0.5 overflow-hidden transition-all", (!sidebarOpen && !mobileMenuOpen) && "md:opacity-0 md:h-0 md:p-0 md:mt-0")}>
+          <div className={cn(
+            "p-3 mx-2 mt-3 border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-xl space-y-0.5 overflow-hidden transition-all", 
+            (!sidebarOpen && !mobileMenuOpen) && "md:opacity-0 md:h-0 md:p-0 md:mt-0"
+          )}>
             <div className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
               <User size={12} className="text-primary" />
               <p className="text-xs font-semibold truncate">{user?.name}</p>
             </div>
             <p className="text-[9px] font-mono font-bold uppercase text-zinc-400 tracking-wider truncate">{user?.role}</p>
           </div>
+        </div>
 
-          {/* Navigation */}
-          <nav className="px-3 py-4 space-y-1">
+        {/* 2. CENTRE SCROLLABLE (Navigation) */}
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 hover:scrollbar-thumb-zinc-300 dark:hover:scrollbar-thumb-zinc-700">
+          <div className="space-y-1">
             {allowedItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -152,20 +154,22 @@ export default function NavigationShell({ children }: { children: React.ReactNod
                 </Link>
               );
             })}
-          </nav>
+          </div>
         </div>
 
-        {/* Footer Sidebar (Logout) */}
-        <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
+        {/* 3. FOOTER FIXE (Actions Système) */}
+        <div className="flex-none p-3 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-[#121214]">
           <button
             onClick={async () => {
               await logout();
               router.push("/");
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer text-left overflow-hidden"
           >
-            <LogOut size={18} />
-            <span className={cn(!sidebarOpen && !mobileMenuOpen && "md:hidden")}>Déconnexion</span>
+            <LogOut size={18} className="shrink-0" />
+            <span className={cn("transition-all duration-200", !sidebarOpen && !mobileMenuOpen && "md:hidden opacity-0")}>
+              Déconnexion
+            </span>
           </button>
         </div>
       </aside>
