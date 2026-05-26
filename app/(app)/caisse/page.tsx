@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownLeft, Filter, Search, Building2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { 
+  Plus, TrendingUp, TrendingDown, Wallet, ArrowUpRight, 
+  ArrowDownLeft, Filter, Search, Building2, Calendar as CalendarIcon,
+  ChevronLeft, ChevronRight, History, Receipt, Banknote, ShieldCheck
+} from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
 import { CashTransaction, CashCategory, CashTransactionType, Branch } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -58,6 +62,9 @@ export default function CaissePage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<CashTransactionType | "Tous">("Tous");
+  
+  // ÉTAT POUR LE FILTRAGE TEMPOREL INTELLIGENT
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -80,7 +87,7 @@ export default function CaissePage() {
       user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
     ]);
 
-    setTransactions(transactionsData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    setTransactions(transactionsData);
     setBranches(branchesData);
     setLoading(false);
   };
@@ -88,6 +95,29 @@ export default function CaissePage() {
   useEffect(() => {
     loadData();
   }, [user?.agencyId, user?.branchId, user?.role]);
+
+  // LOGIQUE DE FILTRAGE INTELLIGENT (DATE + TYPE)
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      // 1. Filtrage par Date (Y-M-D)
+      const tDate = t.timestamp.split("T")[0];
+      const dateMatch = tDate === selectedDate;
+      if (!dateMatch) return false;
+
+      // 2. Filtrage par Type
+      if (filterType !== "Tous" && t.type !== filterType) return false;
+
+      return true;
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [transactions, selectedDate, filterType]);
+
+  const totals = useMemo(() => {
+    return filteredTransactions.reduce((acc, curr) => {
+      if (curr.type === "Entrée") acc.in += curr.amount;
+      else acc.out += curr.amount;
+      return acc;
+    }, { in: 0, out: 0 });
+  }, [filteredTransactions]);
 
   const onSubmit = async (values: TransactionFormValues) => {
     try {
@@ -111,67 +141,100 @@ export default function CaissePage() {
     }
   };
 
-  const totals = transactions.reduce((acc, curr) => {
-    if (curr.type === "Entrée") acc.in += curr.amount;
-    else acc.out += curr.amount;
-    return acc;
-  }, { in: 0, out: 0 });
-
-  const filteredTransactions = transactions.filter(t => filterType === "Tous" || t.type === filterType);
+  const isToday = selectedDate === new Date().toISOString().split("T")[0];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground uppercase tracking-tighter">
-            {user?.role === "Admin Succursale" ? "Caisse Locale" : "Trésorerie de l'Agence"}
+      {/* HEADER AVEC CONTRÔLE DE DATE INTELLIGENT */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-card p-6 rounded-2xl border border-border shadow-sm">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground flex items-center gap-2">
+            <Receipt className="text-primary h-8 w-8" />
+            {user?.role === "Admin Succursale" ? "Caisse de Site" : "Trésorerie Agence"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {user?.role === "Admin Succursale" 
-              ? `Opérations financières de ${branches.find(b => b.id === user.branchId)?.name || "votre succursale"}.` 
-              : "Suivi global des flux financiers multi-sites."}
+          <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+            <div className={cn("h-2 w-2 rounded-full animate-pulse", isToday ? "bg-emerald-500" : "bg-amber-500")} />
+            {isToday ? "Journal de caisse en direct" : `Archives du ${new Date(selectedDate).toLocaleDateString("fr-FR", { day: 'numeric', month: 'long', year: 'numeric' })}`}
           </p>
         </div>
-        <Button onClick={() => {
-          form.reset({
-            type: "Entrée", amount: 0, description: "", category: "Billet",
-            branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global"
-          });
-          setIsDialogOpen(true);
-        }} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm">
-          <Plus className="mr-2 h-4 w-4" /> Nouvelle Opération
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Sélecteur de date intelligent */}
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-border">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-lg"
+              onClick={() => {
+                const date = new Date(selectedDate);
+                date.setDate(date.getDate() - 1);
+                setSelectedDate(date.toISOString().split("T")[0]);
+              }}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            
+            <div className="flex items-center gap-2 px-3 py-1 text-xs font-bold uppercase tracking-widest text-foreground">
+              <CalendarIcon size={14} className="text-primary" />
+              <input 
+                type="date" 
+                value={selectedDate} 
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent border-none focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-lg"
+              disabled={isToday}
+              onClick={() => {
+                const date = new Date(selectedDate);
+                date.setDate(date.getDate() + 1);
+                setSelectedDate(date.toISOString().split("T")[0]);
+              }}
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm h-10">
+            <Plus className="mr-2 h-4 w-4" /> Opération
+          </Button>
+        </div>
       </div>
 
+      {/* STATS DU JOUR / DE LA DATE SÉLECTIONNÉE */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border-border bg-card shadow-sm group hover:border-primary/50 transition-colors">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Solde Disponible</CardTitle>
-            <div className="p-2 rounded-lg bg-primary/10 text-primary"><Wallet className="h-4 w-4" /></div>
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Solde Période</CardTitle>
+            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform"><Banknote className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{(totals.in - totals.out).toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium italic">Fonds en main sur ce périmètre</p>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{(totals.in - totals.out).toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium italic">Résultat net sur la journée sélectionnée</p>
           </CardContent>
         </Card>
         <Card className="border-border bg-card shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Flux Entrants</CardTitle>
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Recettes</CardTitle>
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><TrendingUp className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-500">{totals.in.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase">Cumul des revenus</p>
+            <div className="text-2xl font-bold text-emerald-500 tabular-nums">{totals.in.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-tighter">Total entrées</p>
           </CardContent>
         </Card>
         <Card className="border-border bg-card shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Flux Sortants</CardTitle>
+            <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Dépenses</CardTitle>
             <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500"><TrendingDown className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-500">{totals.out.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase">Cumul des dépenses</p>
+            <div className="text-2xl font-bold text-rose-500 tabular-nums">{totals.out.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-tighter">Total sorties</p>
           </CardContent>
         </Card>
       </div>
@@ -191,7 +254,7 @@ export default function CaissePage() {
           onClick={() => setFilterType("Entrée")}
           className="rounded-full text-[10px] uppercase font-bold h-7 px-4 border-border"
         >
-          Entrées uniquement
+          Recettes
         </Button>
         <Button 
           variant={filterType === "Sortie" ? "default" : "outline"} 
@@ -199,7 +262,7 @@ export default function CaissePage() {
           onClick={() => setFilterType("Sortie")}
           className="rounded-full text-[10px] uppercase font-bold h-7 px-4 border-border"
         >
-          Sorties uniquement
+          Dépenses
         </Button>
       </div>
 
@@ -207,9 +270,9 @@ export default function CaissePage() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="border-border">
-              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date & Heure</TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description / Catégorie</TableHead>
-              {user?.role === "Admin Agence" && <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Provenance</TableHead>}
+              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Heure</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Désignation / Catégorie</TableHead>
+              {user?.role === "Admin Agence" && <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Site</TableHead>}
               <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Montant</TableHead>
             </TableRow>
           </TableHeader>
@@ -219,21 +282,23 @@ export default function CaissePage() {
                 <TableRow key={i} className="border-border">
                   <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                  {user?.role === "Admin Agence" && <TableCell><Skeleton className="h-5 w-24" /></TableCell>}
                   <TableCell><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.role === "Admin Agence" ? 4 : 3} className="h-32 text-center text-muted-foreground italic border-border">
-                  Aucune transaction enregistrée.
+                <TableCell colSpan={user?.role === "Admin Agence" ? 4 : 3} className="h-40 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
+                    <History className="h-8 w-8 opacity-20" />
+                    <p className="italic text-xs">Aucun mouvement pour cette date.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               filteredTransactions.map((t) => (
                 <TableRow key={t.id} className="hover:bg-muted/30 border-border transition-colors group">
-                  <TableCell className="text-[10px] text-muted-foreground font-mono font-medium">
-                    {new Date(t.timestamp).toLocaleString("fr-FR", { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  <TableCell className="text-[10px] text-muted-foreground font-mono font-bold">
+                    {new Date(t.timestamp).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
                   </TableCell>
                   <TableCell>
                     <div className="space-y-0.5">
@@ -264,6 +329,21 @@ export default function CaissePage() {
             )}
           </TableBody>
         </Table>
+        
+        {/* FOOTER DE CLÔTURE VISUELLE */}
+        {!loading && filteredTransactions.length > 0 && (
+          <div className="p-4 bg-muted/20 border-t border-border flex items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-widest">
+              <ShieldCheck size={16} /> 
+              Caisse balancée pour ce jour
+            </div>
+            <div className="text-sm font-bold text-foreground">
+              Total Net : <span className={cn(totals.in - totals.out >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                {(totals.in - totals.out).toLocaleString()} FCFA
+              </span>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

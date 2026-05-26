@@ -57,7 +57,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.643 0.198 147.96); /* Vert Supabase en mode clair */
-  --primary-foreground: oklch(0.985 0 0);
+  --primary-foreground: oklch(1 0 0); /* TEXTE BLANC PUR */
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -93,7 +93,7 @@
   --popover: oklch(0.141 0.005 285.82);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.696 0.17 149.21);      /* Vert émeraude vibrant Supabase #10b981 */
-  --primary-foreground: oklch(0.129 0.006 285.84); /* Texte noir sur bouton vert */
+  --primary-foreground: oklch(1 0 0);       /* TEXTE BLANC PUR */
   --secondary: oklch(0.228 0.006 285.89);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.228 0.006 285.89);
