@@ -36,7 +36,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const savedSession = await localforage.getItem<SessionUser>(
         STORAGE_KEYS.CURRENT_SESSION
       );
-      set({ user: savedSession, loading: false });
+      if (savedSession) {
+        set({ user: savedSession, loading: false });
+        // S'assurer que le cookie est présent pour le middleware au reload
+        document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(savedSession))}; path=/; max-age=86400`;
+      } else {
+        set({ user: null, loading: false });
+      }
     } catch (error) {
       console.error("Erreur d'initialisation de session :", error);
       set({ user: null, loading: false });
@@ -49,6 +55,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (userSession: SessionUser) => {
     set({ user: userSession });
     await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, userSession);
+    // SET COOKIE POUR LE MIDDLEWARE
+    document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(userSession))}; path=/; max-age=86400`;
   },
 
   // ========================================================================
