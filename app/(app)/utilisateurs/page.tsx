@@ -99,6 +99,8 @@ export default function UtilisateursPage() {
         siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
         ...values,
         branchId: values.branchId === "global" ? null : values.branchId,
+        password: "motoka2026", // Mot de passe par défaut
+        mustChangePassword: true, // Forcer le changement au premier login
       } as AppUser;
 
       const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];

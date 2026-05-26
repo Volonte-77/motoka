@@ -186,6 +186,24 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         </header>
 
         <main className="p-4 md:p-8 max-w-7xl mx-auto">
+          {user?.mustChangePassword && (
+            <div className="mb-6 p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600">
+                  <Key size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-100">Sécurité : Mot de passe temporaire</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">Vous utilisez un mot de passe par défaut. Veuillez le modifier pour sécuriser votre accès.</p>
+                </div>
+              </div>
+              <Link href="/settings">
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white border-none shadow-sm whitespace-nowrap">
+                  Modifier maintenant
+                </Button>
+              </Link>
+            </div>
+          )}
           {children}
         </main>
       </div>

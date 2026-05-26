@@ -45,6 +45,7 @@ export interface SessionUser {
   siteAccess: string;              // "Global" ou nom du site spécifique
   driverId?: string;               // Si Chauffeur assigné
   clientId?: string;               // Si Client agence
+  mustChangePassword?: boolean;    // Pour forcer le changement au premier login
 }
 
 /**
