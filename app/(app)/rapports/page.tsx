@@ -8,7 +8,9 @@ import {
   ArrowDownLeft, ArrowUpRight, ShieldCheck, RefreshCw,
   Eye, FileText, Calendar as CalendarIcon, Printer,
   Table as TableIcon, PieChart as PieIcon, CheckCircle2,
-  AlertCircle, ArrowRight
+  AlertCircle, ArrowRight,
+  MapPin,
+  Car
 } from "lucide-react";
 
 import { 
