@@ -7,9 +7,6 @@ import ClientInitializer from "@/components/client-initializer";
 export const metadata: Metadata = {
   title: "Motoka — Gestion d'Agence de Transport",
   description: "Plateforme SaaS de gestion intelligente pour agences de transport et logistique.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
