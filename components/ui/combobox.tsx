@@ -31,6 +31,7 @@ interface ComboboxProps {
   placeholder?: string
   emptyText?: string
   className?: string
+  disabled?: boolean
 }
 
 export function Combobox({
@@ -40,17 +41,19 @@ export function Combobox({
   placeholder = "Sélectionner...",
   emptyText = "Aucun résultat trouvé.",
   className,
+  disabled,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={disabled ? () => {} : setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-normal", className)}
+          disabled={disabled}
+          className={cn("w-full justify-between bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-normal disabled:opacity-50 disabled:cursor-not-allowed", className)}
         >
           {value
             ? options.find((option) => option.value === value)?.label
