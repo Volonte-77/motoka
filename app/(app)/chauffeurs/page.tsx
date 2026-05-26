@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, User, Phone, Mail, BadgeCheck } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, User, Phone, Mail, BadgeCheck, MapPin } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
 import { AppUser, UserRole, Branch } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -144,10 +144,10 @@ export default function ChauffeursPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground">
             {user?.role === "Admin Succursale" ? "Nos Chauffeurs" : "Conducteurs de l'Agence"}
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             {user?.role === "Admin Succursale" 
               ? "Gérez l'équipe de conducteurs affectée à votre site." 
               : "Gérez l'ensemble des chauffeurs à travers toutes les succursales."}
@@ -160,40 +160,40 @@ export default function ChauffeursPage() {
             branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global"
           }); 
           setIsDialogOpen(true); 
-        }} className="bg-primary hover:bg-primary/90 text-white">
+        }} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm">
           <Plus className="mr-2 h-4 w-4" /> Ajouter un chauffeur
         </Button>
       </div>
 
-      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+      <Card className="border-border bg-card shadow-sm">
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher par nom, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+              className="pl-10 bg-muted/30 border-border"
             />
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden">
+      <Card className="border-border bg-card shadow-sm overflow-hidden">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Chauffeur</TableHead>
-              <TableHead>Contact</TableHead>
-              {user?.role === "Admin Agence" && <TableHead>Affectation</TableHead>}
-              <TableHead>Statut</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="border-border">
+              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Chauffeur</TableHead>
+              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Contact</TableHead>
+              {user?.role === "Admin Agence" && <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Affectation</TableHead>}
+              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Statut</TableHead>
+              <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
+                <TableRow key={i} className="border-border">
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   {user?.role === "Admin Agence" && <TableCell><Skeleton className="h-5 w-24" /></TableCell>}
@@ -203,37 +203,37 @@ export default function ChauffeursPage() {
               ))
             ) : filteredDrivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.role === "Admin Agence" ? 5 : 4} className="h-32 text-center text-zinc-500">
+                <TableCell colSpan={user?.role === "Admin Agence" ? 5 : 4} className="h-32 text-center text-muted-foreground italic border-border">
                   Aucun chauffeur trouvé.
                 </TableCell>
               </TableRow>
             ) : (
               filteredDrivers.map((driver) => (
-                <TableRow key={driver.id}>
-                  <TableCell className="font-medium dark:text-zinc-200">
+                <TableRow key={driver.id} className="hover:bg-muted/30 border-border transition-colors group">
+                  <TableCell className="font-medium">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <User size={14} />
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform font-bold">
+                        {driver.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p>{driver.name}</p>
-                        <p className="text-[10px] text-zinc-500 font-mono">ID: {driver.id}</p>
+                        <p className="text-sm font-bold text-foreground leading-none">{driver.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono mt-1">ID: {driver.id}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-                        <Phone size={10} /> {driver.phone}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Phone size={10} className="text-primary/60" /> {driver.phone}
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-mono">
-                        <BadgeCheck size={10} /> {driver.license}
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                        <BadgeCheck size={10} className="text-primary/60" /> {driver.license}
                       </div>
                     </div>
                   </TableCell>
                   {user?.role === "Admin Agence" && (
                     <TableCell>
-                      <Badge variant="outline" className="text-[9px] uppercase font-bold border-zinc-200 dark:border-zinc-800">
+                      <Badge variant="outline" className="text-[9px] uppercase font-bold border-border bg-muted/50 text-muted-foreground">
                         {branches.find(b => b.id === driver.branchId)?.name || "Siège Social"}
                       </Badge>
                     </TableCell>
@@ -242,15 +242,15 @@ export default function ChauffeursPage() {
                     <Badge variant="outline" className={
                       driver.status === "Disponible" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/5" :
                       driver.status === "Mission" ? "border-blue-500/50 text-blue-500 bg-blue-500/5" :
-                      "border-zinc-500/50 text-zinc-500 bg-zinc-500/5"
+                      "border-border text-muted-foreground bg-muted/50"
                     }>
                       {driver.status || "Inactif"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(driver)} className="h-8 w-8">
-                        <Edit2 className="h-4 w-4 text-zinc-500" />
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(driver)} className="h-8 w-8 hover:bg-muted">
+                        <Edit2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     </div>
                   </TableCell>
@@ -262,10 +262,10 @@ export default function ChauffeursPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
+        <DialogContent className="sm:max-w-[500px] bg-card border-border shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="font-bold">{editingDriver ? "Modifier le chauffeur" : "Ajouter un chauffeur"}</DialogTitle>
-            <DialogDescription>Profil conducteur et affectation géographique.</DialogDescription>
+            <DialogTitle className="font-bold text-xl text-foreground tracking-tight">{editingDriver ? "Modifier le chauffeur" : "Ajouter un chauffeur"}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">Profil conducteur et affectation géographique.</DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
@@ -275,8 +275,8 @@ export default function ChauffeursPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nom Complet</FormLabel>
-                    <FormControl><Input placeholder="Jean Dupont" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                    <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Nom Complet</FormLabel>
+                    <FormControl><Input placeholder="Jean Dupont" {...field} className="bg-muted/30 border-border" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -287,8 +287,8 @@ export default function ChauffeursPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl><Input placeholder="jean@motoka.com" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Email</FormLabel>
+                      <FormControl><Input placeholder="jean@motoka.com" {...field} className="bg-muted/30 border-border" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -298,8 +298,8 @@ export default function ChauffeursPage() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Téléphone</FormLabel>
-                      <FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Téléphone</FormLabel>
+                      <FormControl><Input placeholder="+243..." {...field} className="bg-muted/30 border-border" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -311,21 +311,17 @@ export default function ChauffeursPage() {
                 name="branchId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Affectation (Succursale)</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Affectation (Succursale)</FormLabel>
                     <FormControl>
                       <Combobox
-                        options={[
-                          { value: "global", label: "Siège Social / Agence" },
-                          ...branches.map(b => ({ value: b.id, label: b.name }))
-                        ]}
+                        options={[{ value: "global", label: "Siège Social / Agence" }, ...branches.map(b => ({ value: b.id, label: b.name }))]}
                         value={field.value || "global"}
                         onChange={field.onChange}
-                        placeholder="Affecter à un site"
                         disabled={user?.role === "Admin Succursale"}
                       />
                     </FormControl>
                     {user?.role === "Admin Succursale" && (
-                      <p className="text-[10px] text-zinc-500 mt-1 italic">Verrouillé sur votre site actuel.</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 italic">Verrouillé sur votre site actuel.</p>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -338,8 +334,8 @@ export default function ChauffeursPage() {
                   name="license"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>N° Permis</FormLabel>
-                      <FormControl><Input placeholder="P-123456" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">N° Permis</FormLabel>
+                      <FormControl><Input placeholder="P-123456" {...field} className="bg-muted/30 border-border font-mono" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -349,7 +345,7 @@ export default function ChauffeursPage() {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Statut Initial</FormLabel>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Statut Initial</FormLabel>
                       <FormControl>
                         <Combobox
                           options={[
@@ -360,7 +356,6 @@ export default function ChauffeursPage() {
                           ]}
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder="Choisir le statut"
                         />
                       </FormControl>
                       <FormMessage />
@@ -368,9 +363,9 @@ export default function ChauffeursPage() {
                   )}
                 />
               </div>
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                <Button type="submit" className="bg-primary text-white">{editingDriver ? "Mettre à jour" : "Enregistrer"}</Button>
+              <DialogFooter className="pt-4 gap-2">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="hover:bg-muted font-medium">Annuler</Button>
+                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8">{editingDriver ? "Mettre à jour" : "Enregistrer"}</Button>
               </DialogFooter>
             </form>
           </Form>

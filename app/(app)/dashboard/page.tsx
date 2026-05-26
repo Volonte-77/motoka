@@ -132,21 +132,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       {/* HEADER INTELLIGENT */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white dark:bg-[#121214] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-6 rounded-2xl border border-border shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
           <ShieldCheck size={120} className="text-primary" />
         </div>
         
         <div className="space-y-1 relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {user?.name}
             </h1>
             <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] font-bold">
               {user?.role}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 text-zinc-500">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <MapPin size={14} className="text-primary" />
             <p className="text-sm font-medium">
               {user?.role === "Admin Succursale" 
@@ -158,8 +158,8 @@ export default function DashboardPage() {
         
         <div className="relative z-10">
           {user?.role === "Admin Agence" ? (
-            <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase ml-2 tracking-widest">Périmètre :</span>
+            <div className="flex items-center gap-3 bg-muted/50 p-2 rounded-xl border border-border">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase ml-2 tracking-widest">Périmètre :</span>
               <Combobox
                 options={[
                   { value: "all", label: "Toutes les succursales" },
@@ -171,9 +171,9 @@ export default function DashboardPage() {
               />
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+              <span className="text-xs font-bold uppercase tracking-widest">
                 Session Active : {currentBranch?.city || "Local"}
               </span>
             </div>
@@ -214,13 +214,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-12">
-        <Card className="md:col-span-8 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <Card className="md:col-span-8 border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
               <TrendingUp size={16} className="text-primary" /> 
               {user?.role === "Admin Succursale" ? "Recettes Locales" : "Recettes Consolidées"}
             </CardTitle>
-            <Badge variant="outline" className="text-[10px] font-mono">7 DERNIERS JOURS</Badge>
+            <Badge variant="outline" className="text-[10px] font-mono border-border">7 DERNIERS JOURS</Badge>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[240px] w-full">
@@ -231,13 +231,14 @@ export default function DashboardPage() {
                     <stop offset="95%" stopColor="var(--color-amount)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-100 dark:stroke-zinc-800" />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis 
                   dataKey="day" 
                   tickLine={false} 
                   axisLine={false} 
                   tickMargin={8}
-                  tick={{fontSize: 10}}
+                  tick={{fontSize: 10, fill: 'currentColor'}}
+                  className="text-muted-foreground"
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area 
@@ -253,9 +254,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-4 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
+        <Card className="md:col-span-4 border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
               <Clock size={16} className="text-amber-500" /> Activités Récentes
             </CardTitle>
           </CardHeader>
@@ -263,36 +264,36 @@ export default function DashboardPage() {
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
             ) : (
-              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-1 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-zinc-100 dark:before:via-zinc-800 before:to-transparent">
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-1 before:-translate-x-px before:h-full before:w-0.5 before:bg-muted/50">
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="absolute left-0 h-2 w-2 rounded-full bg-primary ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-primary ring-4 ring-card" />
                     <div className="pl-6">
-                      <p className="text-xs font-bold dark:text-zinc-200">Course créée</p>
-                      <p className="text-[10px] text-zinc-500">Goma → Bukavu</p>
+                      <p className="text-xs font-bold text-foreground">Course créée</p>
+                      <p className="text-[10px] text-muted-foreground">Goma → Bukavu</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-zinc-400">5m</span>
+                  <span className="text-[10px] text-muted-foreground">5m</span>
                 </div>
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="absolute left-0 h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-card" />
                     <div className="pl-6">
-                      <p className="text-xs font-bold dark:text-zinc-200">Colis livré</p>
-                      <p className="text-[10px] text-zinc-500">ID: PKG-8291</p>
+                      <p className="text-xs font-bold text-foreground">Colis livré</p>
+                      <p className="text-[10px] text-muted-foreground">ID: PKG-8291</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-zinc-400">12m</span>
+                  <span className="text-[10px] text-muted-foreground">12m</span>
                 </div>
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="absolute left-0 h-2 w-2 rounded-full bg-amber-500 ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-amber-500 ring-4 ring-card" />
                     <div className="pl-6">
-                      <p className="text-xs font-bold dark:text-zinc-200">Nouvelle dépense</p>
-                      <p className="text-[10px] text-zinc-500">Maintenance Carburant</p>
+                      <p className="text-xs font-bold text-foreground">Nouvelle dépense</p>
+                      <p className="text-[10px] text-muted-foreground">Maintenance Carburant</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-zinc-400">45m</span>
+                  <span className="text-[10px] text-muted-foreground">45m</span>
                 </div>
               </div>
             )}
