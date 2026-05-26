@@ -145,6 +145,16 @@ export default function UtilisateursPage() {
     try {
       const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
       
+      // Validation d'intégrité : un Admin Succursale DOIT être lié à une branche
+      if (values.role === "Admin Succursale" && values.branchId === "global") {
+        toast.error("Un administrateur de succursale doit être affecté à une succursale spécifique.");
+        return;
+      }
+
+      const selectedBranchName = values.branchId === "global" 
+        ? "Siège Social" 
+        : branches.find(b => b.id === values.branchId)?.name || "Succursale";
+
       if (userToEdit) {
         // Mode ÉDITION
         const updatedUsers = allUsers.map(u => {
@@ -153,7 +163,7 @@ export default function UtilisateursPage() {
               ...u,
               ...values,
               branchId: values.branchId === "global" ? null : values.branchId,
-              siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
+              siteAccess: selectedBranchName,
             };
           }
           return u;
@@ -165,14 +175,14 @@ export default function UtilisateursPage() {
         const newUser: AppUser = {
           id: Math.random().toString(36).substr(2, 9),
           agencyId: currentUser?.agencyId || "default",
-          siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
+          siteAccess: selectedBranchName,
           ...values,
           branchId: values.branchId === "global" ? null : values.branchId,
           password: "motoka2026",
           mustChangePassword: true,
         } as AppUser;
         await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...allUsers, newUser]);
-        toast.success(`L'utilisateur ${values.name} a été créé`);
+        toast.success(`L'utilisateur ${values.name} a été créé en tant que ${values.role}`);
       }
       
       await loadData();
@@ -385,8 +395,14 @@ export default function UtilisateursPage() {
                       value={field.value || "global"}
                       onChange={field.onChange}
                       placeholder="Choisir une affectation"
+                      disabled={currentUser?.role === "Admin Succursale"}
                     />
                   </FormControl>
+                  {currentUser?.role === "Admin Succursale" && (
+                    <p className="text-[10px] text-zinc-500 mt-1 italic">
+                      Verrouillé sur votre succursale actuelle.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

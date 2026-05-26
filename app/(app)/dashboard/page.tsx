@@ -12,7 +12,7 @@ import {
   TrendingUp, 
   MapPin, 
   Clock,
-  ArrowUpRight
+  ShieldCheck
 } from "lucide-react";
 
 import { 
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/chart";
 import { Branch } from "@/types";
 import { Combobox } from "@/components/ui/combobox";
+import { Badge } from "@/components/ui/badge";
 
 const revenueData = [
   { day: "Lun", amount: 45000 },
@@ -44,13 +45,14 @@ const revenueData = [
 const chartConfig = {
   amount: {
     label: "Recettes",
-    color: "#0ea5e9", // Bleu Ciel vibrant
+    color: "#0ea5e9",
   },
 } satisfies ChartConfig;
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | "all">("all");
   const [stats, setStats] = useState({
     vehicles: 0,
@@ -61,26 +63,35 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Charger les succursales si c'est un Admin Agence
   useEffect(() => {
-    if (user?.role === "Admin Agence" && user.agencyId) {
-      mockApi.agencies.getBranches(user.agencyId).then(setBranches);
-    }
+    const fetchBranchData = async () => {
+      if (!user?.agencyId) return;
+      const branchList = await mockApi.agencies.getBranches(user.agencyId);
+      
+      if (user.role === "Admin Agence") {
+        setBranches(branchList);
+      } else if (user.branchId) {
+        const myBranch = branchList.find(b => b.id === user.branchId);
+        if (myBranch) setCurrentBranch(myBranch);
+      }
+    };
+    fetchBranchData();
   }, [user]);
 
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       const agencyId = user?.agencyId || null;
-      // Déterminer le branchId à filtrer (null si "all" ou si pas de branche)
-      const branchId = selectedBranchId === "all" ? null : selectedBranchId;
+      const effectiveBranchId = user?.role === "Admin Succursale" 
+        ? user.branchId 
+        : (selectedBranchId === "all" ? null : selectedBranchId);
 
       const [v, d, p, t, c] = await Promise.all([
-        mockApi.vehicles.getAll(agencyId, branchId),
-        mockApi.drivers.getAll(agencyId, branchId),
-        mockApi.packages.getAll(agencyId, branchId),
-        mockApi.trips.getAll(agencyId, branchId),
-        mockApi.cash.getAll(agencyId, branchId)
+        mockApi.vehicles.getAll(agencyId, effectiveBranchId),
+        mockApi.drivers.getAll(agencyId, effectiveBranchId),
+        mockApi.packages.getAll(agencyId, effectiveBranchId),
+        mockApi.trips.getAll(agencyId, effectiveBranchId),
+        mockApi.cash.getAll(agencyId, effectiveBranchId)
       ]);
 
       const revenue = c.reduce((acc, curr) => acc + (curr.type === "Entrée" ? curr.amount : -curr.amount), 0);
@@ -95,97 +106,124 @@ export default function DashboardPage() {
       setLoading(false);
     };
     loadStats();
-  }, [user?.agencyId, selectedBranchId]);
+  }, [user?.agencyId, user?.branchId, user?.role, selectedBranchId]);
 
-  const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
-    <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden relative">
+  const StatCard = ({ title, value, icon: Icon, color, description }: any) => (
+    <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden relative group hover:border-primary transition-all duration-300">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-500">{title}</CardTitle>
-        <div className={`p-2 rounded-lg ${color}`}>
-          <Icon size={16} />
+        <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{title}</CardTitle>
+        <div className={`p-2 rounded-lg ${color} group-hover:scale-110 transition-transform`}>
+          <Icon size={14} />
         </div>
       </CardHeader>
       <CardContent>
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
-          <div className="text-2xl font-bold text-zinc-900 dark:text-white">{value}</div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-white">
+            {typeof value === 'number' && title.includes('Recettes') ? value.toLocaleString() + ' FCFA' : value}
+          </div>
         )}
-        {trend && (
-          <p className="text-[10px] font-medium text-emerald-500 flex items-center gap-1 mt-1">
-            <ArrowUpRight size={10} /> {trend}
-          </p>
-        )}
+        <p className="text-[10px] text-zinc-500 mt-1 truncate font-medium">{description}</p>
       </CardContent>
     </Card>
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
-            Bonjour, {user?.name}
-          </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Voici ce qui se passe dans votre agence aujourd'hui.
-          </p>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      {/* HEADER INTELLIGENT */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white dark:bg-[#121214] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <ShieldCheck size={120} className="text-primary" />
         </div>
         
-        {user?.role === "Admin Agence" && (
-          <div className="flex items-center gap-2 min-w-[250px]">
-            <span className="text-xs font-medium text-zinc-500 whitespace-nowrap">Vue :</span>
-            <Combobox
-              options={[
-                { value: "all", label: "Toutes les succursales" },
-                ...branches.map(b => ({ value: b.id, label: b.name }))
-              ]}
-              value={selectedBranchId}
-              onChange={(val) => setSelectedBranchId(val as string)}
-              placeholder="Filtrer par succursale"
-            />
+        <div className="space-y-1 relative z-10">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              {user?.name}
+            </h1>
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] font-bold">
+              {user?.role}
+            </Badge>
           </div>
-        )}
+          <div className="flex items-center gap-2 text-zinc-500">
+            <MapPin size={14} className="text-primary" />
+            <p className="text-sm font-medium">
+              {user?.role === "Admin Succursale" 
+                ? `Gestionnaire : Succursale de ${currentBranch?.name || "..."}`
+                : "Direction Générale - Vue d'ensemble"}
+            </p>
+          </div>
+        </div>
+        
+        <div className="relative z-10">
+          {user?.role === "Admin Agence" ? (
+            <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase ml-2 tracking-widest">Périmètre :</span>
+              <Combobox
+                options={[
+                  { value: "all", label: "Toutes les succursales" },
+                  ...branches.map(b => ({ value: b.id, label: b.name }))
+                ]}
+                value={selectedBranchId}
+                onChange={(val) => setSelectedBranchId(val as string)}
+                placeholder="Filtrer..."
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                Session Active : {currentBranch?.city || "Local"}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* STATS SCOPÉES */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="Courses actives" 
           value={stats.trips} 
           icon={MapPin} 
-          trend="+3 cette heure"
+          description={user?.role === "Admin Succursale" ? "Trajets au départ de votre site" : "Total agence"}
           color="bg-blue-500/10 text-blue-500" 
         />
         <StatCard 
           title="Colis en attente" 
           value={stats.packages} 
           icon={Package} 
-          trend="+12 nouveaux"
+          description={user?.role === "Admin Succursale" ? "Dans votre dépôt local" : "Flux global colis"}
           color="bg-amber-500/10 text-amber-500" 
         />
         <StatCard 
-          title="Véhicules" 
-          value={stats.vehicles} 
-          icon={Car} 
-          color="bg-zinc-500/10 text-zinc-500" 
+          title="Recettes de caisse" 
+          value={stats.revenue} 
+          icon={TrendingUp} 
+          description={user?.role === "Admin Succursale" ? "Performance de votre site" : "Chiffre d'affaires global"}
+          color="bg-emerald-500/10 text-emerald-500" 
         />
         <StatCard 
-          title="Chauffeurs" 
+          title="Équipe de terrain" 
           value={stats.drivers} 
           icon={Users} 
-          color="bg-emerald-500/10 text-emerald-500" 
+          description={user?.role === "Admin Succursale" ? "Vos chauffeurs affectés" : "Total chauffeurs agence"}
+          color="bg-zinc-500/10 text-zinc-500" 
         />
       </div>
 
       <div className="grid gap-6 md:grid-cols-12">
         <Card className="md:col-span-8 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <TrendingUp size={16} className="text-primary" /> Recettes de la semaine
+              <TrendingUp size={16} className="text-primary" /> 
+              {user?.role === "Admin Succursale" ? "Recettes Locales" : "Recettes Consolidées"}
             </CardTitle>
+            <Badge variant="outline" className="text-[10px] font-mono">7 DERNIERS JOURS</Badge>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
+            <ChartContainer config={chartConfig} className="h-[240px] w-full">
               <AreaChart data={revenueData}>
                 <defs>
                   <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
@@ -193,18 +231,20 @@ export default function DashboardPage() {
                     <stop offset="95%" stopColor="var(--color-amount)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-zinc-100 dark:stroke-zinc-800" />
                 <XAxis 
                   dataKey="day" 
                   tickLine={false} 
                   axisLine={false} 
                   tickMargin={8}
+                  tick={{fontSize: 10}}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area 
                   type="monotone" 
                   dataKey="amount" 
                   stroke="var(--color-amount)" 
+                  strokeWidth={2}
                   fillOpacity={1} 
                   fill="url(#colorAmount)" 
                 />
@@ -223,24 +263,36 @@ export default function DashboardPage() {
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 border-l-2 border-primary pl-4 py-1">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold dark:text-zinc-200">Nouvelle course créée</p>
-                    <p className="text-[10px] text-zinc-500">Goma → Bukavu • Il y a 5 min</p>
+              <div className="space-y-6 relative before:absolute before:inset-0 before:ml-1 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-zinc-100 dark:before:via-zinc-800 before:to-transparent">
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-primary ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="pl-6">
+                      <p className="text-xs font-bold dark:text-zinc-200">Course créée</p>
+                      <p className="text-[10px] text-zinc-500">Goma → Bukavu</p>
+                    </div>
                   </div>
+                  <span className="text-[10px] text-zinc-400">5m</span>
                 </div>
-                <div className="flex items-start gap-3 border-l-2 border-emerald-500 pl-4 py-1">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold dark:text-zinc-200">Colis livré avec succès</p>
-                    <p className="text-[10px] text-zinc-500">ID: PKG-8291 • Il y a 12 min</p>
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="pl-6">
+                      <p className="text-xs font-bold dark:text-zinc-200">Colis livré</p>
+                      <p className="text-[10px] text-zinc-500">ID: PKG-8291</p>
+                    </div>
                   </div>
+                  <span className="text-[10px] text-zinc-400">12m</span>
                 </div>
-                <div className="flex items-start gap-3 border-l-2 border-zinc-200 dark:border-zinc-800 pl-4 py-1">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold dark:text-zinc-200">Caisse : Dépense carburant</p>
-                    <p className="text-[10px] text-zinc-500">45,000 FCFA • Il y a 45 min</p>
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="absolute left-0 h-2 w-2 rounded-full bg-amber-500 ring-4 ring-white dark:ring-[#121214]" />
+                    <div className="pl-6">
+                      <p className="text-xs font-bold dark:text-zinc-200">Nouvelle dépense</p>
+                      <p className="text-[10px] text-zinc-500">Maintenance Carburant</p>
+                    </div>
                   </div>
+                  <span className="text-[10px] text-zinc-400">45m</span>
                 </div>
               </div>
             )}
