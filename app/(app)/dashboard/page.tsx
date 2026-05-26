@@ -28,6 +28,8 @@ import {
   ChartTooltipContent,
   ChartConfig
 } from "@/components/ui/chart";
+import { Branch } from "@/types";
+import { Combobox } from "@/components/ui/combobox";
 
 const revenueData = [
   { day: "Lun", amount: 45000 },
@@ -48,6 +50,8 @@ const chartConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | "all">("all");
   const [stats, setStats] = useState({
     vehicles: 0,
     drivers: 0,
@@ -57,16 +61,26 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
+  // Charger les succursales si c'est un Admin Agence
+  useEffect(() => {
+    if (user?.role === "Admin Agence" && user.agencyId) {
+      mockApi.agencies.getBranches(user.agencyId).then(setBranches);
+    }
+  }, [user]);
+
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       const agencyId = user?.agencyId || null;
+      // Déterminer le branchId à filtrer (null si "all" ou si pas de branche)
+      const branchId = selectedBranchId === "all" ? null : selectedBranchId;
+
       const [v, d, p, t, c] = await Promise.all([
-        mockApi.vehicles.getAll(agencyId),
-        mockApi.drivers.getAll(agencyId),
-        mockApi.packages.getAll(agencyId),
-        mockApi.trips.getAll(agencyId),
-        mockApi.cash.getAll(agencyId)
+        mockApi.vehicles.getAll(agencyId, branchId),
+        mockApi.drivers.getAll(agencyId, branchId),
+        mockApi.packages.getAll(agencyId, branchId),
+        mockApi.trips.getAll(agencyId, branchId),
+        mockApi.cash.getAll(agencyId, branchId)
       ]);
 
       const revenue = c.reduce((acc, curr) => acc + (curr.type === "Entrée" ? curr.amount : -curr.amount), 0);
@@ -81,7 +95,7 @@ export default function DashboardPage() {
       setLoading(false);
     };
     loadStats();
-  }, [user?.agencyId]);
+  }, [user?.agencyId, selectedBranchId]);
 
   const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
     <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] overflow-hidden relative">
@@ -108,13 +122,30 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
-          Bonjour, {user?.name}
-        </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Voici ce qui se passe dans votre agence aujourd'hui.
-        </p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">
+            Bonjour, {user?.name}
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Voici ce qui se passe dans votre agence aujourd'hui.
+          </p>
+        </div>
+        
+        {user?.role === "Admin Agence" && (
+          <div className="flex items-center gap-2 min-w-[250px]">
+            <span className="text-xs font-medium text-zinc-500 whitespace-nowrap">Vue :</span>
+            <Combobox
+              options={[
+                { value: "all", label: "Toutes les succursales" },
+                ...branches.map(b => ({ value: b.id, label: b.name }))
+              ]}
+              value={selectedBranchId}
+              onChange={(val) => setSelectedBranchId(val as string)}
+              placeholder="Filtrer par succursale"
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -44,8 +44,9 @@ import { Combobox } from "@/components/ui/combobox";
 const userSchema = z.object({
   name: z.string().min(3, "Le nom est requis"),
   email: z.string().email("Email invalide"),
-  role: z.enum(["Admin Agence", "Dispatcher", "Chauffeur", "Comptable"]),
+  role: z.enum(["Admin Agence", "Admin Succursale", "Dispatcher", "Chauffeur", "Comptable"]),
   phone: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
@@ -53,6 +54,7 @@ type UserFormValues = z.infer<typeof userSchema>;
 export default function UtilisateursPage() {
   const { user: currentUser } = useAuthStore();
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,21 +66,28 @@ export default function UtilisateursPage() {
       email: "",
       role: "Dispatcher",
       phone: "",
+      branchId: "global",
     },
   });
 
-  const loadUsers = async () => {
+  const loadData = async () => {
+    if (!currentUser?.agencyId) return;
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const data = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
+    
+    const [userData, branchData] = await Promise.all([
+      localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [],
+      mockApi.agencies.getBranches(currentUser.agencyId)
+    ]);
+    
     // Filtrer par agence
-    const agencyUsers = data.filter(u => u.agencyId === currentUser?.agencyId);
+    const agencyUsers = userData.filter(u => u.agencyId === currentUser.agencyId);
     setUsers(agencyUsers);
+    setBranches(branchData);
     setLoading(false);
   };
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, [currentUser?.agencyId]);
 
   const onSubmit = async (values: UserFormValues) => {
@@ -86,14 +95,15 @@ export default function UtilisateursPage() {
       const newUser: AppUser = {
         id: Math.random().toString(36).substr(2, 9),
         agencyId: currentUser?.agencyId || "default",
-        siteAccess: "Agence",
+        siteAccess: values.branchId === "global" ? "Agence" : branches.find(b => b.id === values.branchId)?.name || "Succursale",
         ...values,
+        branchId: values.branchId === "global" ? null : values.branchId,
       } as AppUser;
 
       const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
       await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...currentUsers, newUser]);
       
-      await loadUsers();
+      await loadData();
       setIsDialogOpen(false);
       form.reset();
       toast.success(`L'utilisateur ${values.name} a été créé`);
@@ -105,6 +115,7 @@ export default function UtilisateursPage() {
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case "Admin Agence": return <Badge className="bg-primary/10 text-primary border-primary/20">Admin Agence</Badge>;
+      case "Admin Succursale": return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">Admin Succursale</Badge>;
       case "Dispatcher": return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Guichetier</Badge>;
       case "Comptable": return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Comptable</Badge>;
       case "Chauffeur": return <Badge className="bg-zinc-500/10 text-zinc-500 border-zinc-500/20">Chauffeur</Badge>;
@@ -214,6 +225,7 @@ export default function UtilisateursPage() {
               <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem><FormLabel>Adresse Email</FormLabel><FormControl><Input placeholder="jean@agence.com" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
               )} />
+              
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="role" render={({ field }) => (
                   <FormItem>
@@ -223,6 +235,7 @@ export default function UtilisateursPage() {
                         options={[
                           { value: "Dispatcher", label: "Guichetier (Dispatcher)" },
                           { value: "Admin Agence", label: "Administrateur d'Agence" },
+                          { value: "Admin Succursale", label: "Administrateur Succursale" },
                           { value: "Comptable", label: "Comptable" },
                           { value: "Chauffeur", label: "Chauffeur" },
                         ]}
@@ -238,6 +251,25 @@ export default function UtilisateursPage() {
                   <FormItem><FormLabel>Téléphone</FormLabel><FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+
+              <FormField control={form.control} name="branchId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Affectation (Succursale)</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      options={[
+                        { value: "global", label: "Siège Principal / Global" },
+                        ...branches.map(b => ({ value: b.id, label: b.name }))
+                      ]}
+                      value={field.value || "global"}
+                      onChange={field.onChange}
+                      placeholder="Choisir une affectation"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <DialogFooter className="pt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
                 <Button type="submit" className="bg-primary text-white">Créer le compte</Button>

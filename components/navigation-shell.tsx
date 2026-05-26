@@ -16,6 +16,7 @@ import { Logo } from "@/components/logo";
 const navigationItems = [
   // --- ESPACE AGENCE / SUCCURSALE ---
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
+  { name: "Succursales", href: "/succursales", icon: Building2, roles: ["Admin Agence"] },
   { name: "Chauffeurs", href: "/chauffeurs", icon: Users, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
   { name: "Véhicules", href: "/vehicules", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur"] },
   { name: "Courses", href: "/courses", icon: Car, roles: ["Admin Agence", "Admin Succursale", "Dispatcher / Opérateur", "Chauffeur"] },

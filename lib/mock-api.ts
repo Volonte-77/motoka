@@ -14,6 +14,14 @@ export const mockApi = {
     getBranches: async (agencyId: string) => {
       const data = await localforage.getItem<Branch[]>(STORAGE_KEYS.BRANCH_LIST) || [];
       return data.filter(b => b.agencyId === agencyId);
+    },
+    saveBranch: async (branch: Branch) => {
+      const data = await localforage.getItem<Branch[]>(STORAGE_KEYS.BRANCH_LIST) || [];
+      const index = data.findIndex(b => b.id === branch.id);
+      if (index >= 0) data[index] = branch;
+      else data.push(branch);
+      await localforage.setItem(STORAGE_KEYS.BRANCH_LIST, data);
+      return branch;
     }
   },
 
