@@ -13,7 +13,8 @@ export type UserRole =
   | "Super Admin SaaS"
   | "Admin Agence"
   | "Admin Succursale"
-  | "Dispatcher / Opérateur"
+  | "Dispatcher"
+  | "Comptable"
   | "Chauffeur"
   | "Client";
 
