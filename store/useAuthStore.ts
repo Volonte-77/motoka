@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import localforage from "localforage";
-import { STORAGE_KEYS, SessionUser } from "@/types";
+import { STORAGE_KEYS, SessionUser, UserRole } from "@/types";
+import apiClient from "@/lib/api-client";
 
 interface AuthState {
   // User & Session
@@ -14,6 +15,7 @@ interface AuthState {
   // Methods
   initializeAuth: () => Promise<void>;
   login: (userSession: SessionUser) => Promise<void>;
+  loginReel: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   switchAgency: (agencyId: string | null) => Promise<void>;  // Pour SuperAdmin
   switchBranch: (branchId: string | null) => Promise<void>;  // Pour Admin Agence
@@ -21,6 +23,17 @@ interface AuthState {
   addToSyncQueue: (action: any) => void;
   clearSyncQueue: () => void;
 }
+
+// Helper pour mapper les rôles Laravel vers le Frontend
+const mapBackendRoleToFrontend = (role: string): UserRole => {
+  switch (role) {
+    case 'superAdmin': return "Super Admin SaaS";
+    case 'adminAgence': return "Admin Agence";
+    case 'dispatcher': return "Dispatcher";
+    case 'chauffeur': return "Chauffeur";
+    default: return "Client";
+  }
+};
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -33,12 +46,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ========================================================================
   initializeAuth: async () => {
     try {
-      const savedSession = await localforage.getItem<SessionUser>(
+      const savedSession = await localforage.getItem<SessionUser & { token?: string }>(
         STORAGE_KEYS.CURRENT_SESSION
       );
       if (savedSession) {
         set({ user: savedSession, loading: false });
-        // S'assurer que le cookie est présent pour le middleware au reload
         document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(savedSession))}; path=/; max-age=86400`;
       } else {
         set({ user: null, loading: false });
@@ -50,7 +62,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // ========================================================================
-  // CONNEXION
+  // CONNEXION RÉELLE (Laravel Sanctum)
+  // ========================================================================
+  loginReel: async (email, password) => {
+    set({ loading: true });
+    try {
+      const response = await apiClient.post("/login", { email, password });
+      const { user, token } = response.data;
+
+      const sessionUser: SessionUser & { token: string } = {
+        id: user.id.toString(),
+        name: user.name,
+        email: user.email,
+        role: mapBackendRoleToFrontend(user.role_enum),
+        agencyId: user.Idagence ? user.Idagence.toString() : null,
+        branchId: null, // À gérer si le backend supporte les succursales
+        siteAccess: user.role_enum === 'superAdmin' ? 'Global' : (user.agence?.nom || 'Agence'),
+        token: token,
+      };
+
+      await get().login(sessionUser);
+    } catch (error: any) {
+      set({ loading: false });
+      throw new Error(error.response?.data?.message || "Erreur d'authentification");
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  // ========================================================================
+  // CONNEXION (Mise en cache)
   // ========================================================================
   login: async (userSession: SessionUser) => {
     set({ user: userSession });
@@ -58,16 +99,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // SET COOKIE POUR LE MIDDLEWARE
     document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(userSession))}; path=/; max-age=86400`;
   },
-
-  // ========================================================================
+...
   // DÉCONNEXION
   // ========================================================================
   logout: async () => {
+    try {
+      await apiClient.post("/logout");
+    } catch (e) {
+      console.warn("Logout backend failed or session already cleared");
+    }
     set({ user: null, syncQueue: [] });
     await localforage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
     // CLEAR COOKIE POUR LE MIDDLEWARE
     document.cookie = "motoka_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   },
+...
+}));
 
   // ========================================================================
   // CHANGEMENT D'AGENCE (SuperAdmin uniquement)
