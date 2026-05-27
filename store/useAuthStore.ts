@@ -76,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: user.email,
         role: mapBackendRoleToFrontend(user.role_enum),
         agencyId: user.Idagence ? user.Idagence.toString() : null,
-        branchId: null, // À gérer si le backend supporte les succursales
+        branchId: null,
         siteAccess: user.role_enum === 'superAdmin' ? 'Global' : (user.agence?.nom || 'Agence'),
         token: token,
       };
@@ -99,7 +99,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // SET COOKIE POUR LE MIDDLEWARE
     document.cookie = `motoka_session=${encodeURIComponent(JSON.stringify(userSession))}; path=/; max-age=86400`;
   },
-...
+
+  // ========================================================================
   // DÉCONNEXION
   // ========================================================================
   logout: async () => {
@@ -113,8 +114,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // CLEAR COOKIE POUR LE MIDDLEWARE
     document.cookie = "motoka_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   },
-...
-}));
 
   // ========================================================================
   // CHANGEMENT D'AGENCE (SuperAdmin uniquement)
@@ -132,7 +131,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       branchId: null, // Reset de la succursale lors du changement d'agence
     };
 
-    await set({ user: updatedUser });
+    set({ user: updatedUser });
     await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, updatedUser);
   },
 
@@ -151,7 +150,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       branchId,
     };
 
-    await set({ user: updatedUser });
+    set({ user: updatedUser });
     await localforage.setItem(STORAGE_KEYS.CURRENT_SESSION, updatedUser);
   },
 
