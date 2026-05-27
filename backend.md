@@ -74,14 +74,13 @@ Remplacer les appels dans `lib/mock-api.ts` par les routes Laravel suivantes :
 | `trips.save` | POST/PUT | `/courses` | (À implémenter côté backend) |
 | `packages.save` | POST/PUT | `/colis` | (À implémenter côté backend) |
 
-
-## 6. Mode Offline & Synchronisation
+## 7. Mode Offline & Synchronisation
 
 Le frontend utilise `localforage` pour le mode offline-first. 
 - Lors d'une perte de connexion, les actions sont ajoutées à `syncQueue`.
-- Dès que la connexion est rétablie, l'IA devra implémenter une fonction de synchronisation qui "rejoue" ces actions vers le backend Laravel.
+- Dès que la connexion est rétablie, une fonction de synchronisation doit "rejouer" ces actions vers le backend Laravel.
 
-## 7. Gestion des Erreurs
+## 8. Gestion des Erreurs
 
 Les erreurs de validation Laravel (Code 422) doivent être mappées pour être affichées par `react-hook-form` :
 ```json
