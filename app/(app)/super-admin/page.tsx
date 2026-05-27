@@ -65,6 +65,8 @@ const planConfig = {
   Basique: { label: "Basique", color: "#f59e0b" },
 } satisfies ChartConfig;
 
+import apiClient from "@/lib/api-client";
+
 export default function SuperAdminDashboard() {
   const { user } = useAuthStore();
   const [stats, setStats] = useState({
@@ -79,19 +81,27 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     const loadGlobalStats = async () => {
       setLoading(true);
-      const [agencies, users] = await Promise.all([
-        localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [],
-        localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [],
-      ]);
+      try {
+        const [agenciesRes, usersRes] = await Promise.all([
+          apiClient.get("/agences"),
+          apiClient.get("/admin/users"),
+        ]);
 
-      setStats({
-        totalAgencies: (agencies as Agency[]).length,
-        activeAgencies: (agencies as Agency[]).filter(a => a.status === "Actif").length,
-        totalUsers: (users as AppUser[]).length,
-        systemHealth: "Optimal",
-        globalRevenue: "12.4M",
-      });
-      setLoading(false);
+        const agencies = agenciesRes.data;
+        const usersData = usersRes.data.data || usersRes.data;
+
+        setStats({
+          totalAgencies: agencies.length,
+          activeAgencies: agencies.filter((a: any) => a.statut_enum === "actif").length,
+          totalUsers: Array.isArray(usersData) ? usersData.length : 0,
+          systemHealth: "Optimal",
+          globalRevenue: "12.4M",
+        });
+      } catch (error) {
+        console.error("Erreur stats super-admin:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadGlobalStats();
   }, []);

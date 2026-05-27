@@ -1,20 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Building2, MapPin, Phone, User, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Building2, MapPin, Phone, User, MoreVertical, Edit, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -35,25 +27,24 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "sonner";
-import { Branch, AppUser } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
-import { mockApi } from "@/lib/mock-api";
+import apiClient from "@/lib/api-client";
 import { Combobox } from "@/components/ui/combobox";
 
 const branchSchema = z.object({
-  name: z.string().min(3, "Le nom est requis"),
-  city: z.string().min(2, "La ville est requise"),
-  address: z.string().min(5, "L'adresse est requise"),
-  phone: z.string().min(10, "Téléphone valide requis"),
-  managerId: z.string().optional(),
+  nom: z.string().min(3, "Le nom est requis"),
+  ville: z.string().min(2, "La ville est requise"),
+  adresse: z.string().min(5, "L'adresse est requise"),
+  telephone: z.string().min(10, "Téléphone valide requis"),
+  Idmanager: z.string().optional(),
 });
 
 type BranchFormValues = z.infer<typeof branchSchema>;
 
 export default function SuccursalesPage() {
   const { user: currentUser } = useAuthStore();
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [users, setUsers] = useState<AppUser[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,62 +52,58 @@ export default function SuccursalesPage() {
   const form = useForm<BranchFormValues>({
     resolver: zodResolver(branchSchema),
     defaultValues: {
-      name: "",
-      city: "",
-      address: "",
-      phone: "",
-      managerId: "",
+      nom: "",
+      ville: "",
+      adresse: "",
+      telephone: "",
+      Idmanager: "",
     },
   });
 
   const loadData = async () => {
-    if (!currentUser?.agencyId) return;
     setLoading(true);
-    const [branchData, userData] = await Promise.all([
-      mockApi.agencies.getBranches(currentUser.agencyId),
-      mockApi.drivers.getAll(currentUser.agencyId) // Ici on pourrait avoir getAllUsers mais drivers.getAll est dispo
-    ]);
-    
-    // Pour cet exemple on va charger tous les utilisateurs de l'agence pour le manager
-    const allUsersData = await mockApi.drivers.getAll(currentUser.agencyId); // Mock simplification
-    
-    setBranches(branchData);
-    setUsers(allUsersData);
-    setLoading(false);
+    try {
+      const [branchesRes, usersRes] = await Promise.all([
+        apiClient.get("/succursales"),
+        apiClient.get("/admin/users")
+      ]);
+      setBranches(branchesRes.data);
+      setUsers(usersRes.data.data || usersRes.data);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, [currentUser?.agencyId]);
+  }, []);
 
   const onSubmit = async (values: BranchFormValues) => {
     try {
-      if (!currentUser?.agencyId) return;
-
-      const newBranch: Branch = {
-        id: Math.random().toString(36).substr(2, 9),
-        agencyId: currentUser.agencyId,
+      setLoading(true);
+      const payload = {
         ...values,
-        createdAt: new Date().toISOString(),
+        Idmanager: values.Idmanager === "" ? null : values.Idmanager,
       };
 
-      await mockApi.agencies.saveBranch(newBranch);
-      
-      // Si un manager est assigné, on peut mettre à jour son rôle/branchId
-      // (Logique simplifiée pour le mock)
+      await apiClient.post("/succursales", payload);
       
       await loadData();
       setIsDialogOpen(false);
       form.reset();
-      toast.success(`La succursale ${values.name} a été créée`);
-    } catch (error) {
-      toast.error("Erreur lors de la création de la succursale");
+      toast.success(`La succursale ${values.nom} a été créée`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Erreur lors de la création");
+    } finally {
+      setLoading(false);
     }
   };
 
   const filteredBranches = branches.filter(b => 
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    b.city.toLowerCase().includes(searchTerm.toLowerCase())
+    b.nom?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    b.ville?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -146,7 +133,7 @@ export default function SuccursalesPage() {
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
+        {loading && branches.length === 0 ? (
           Array.from({ length: 3 }).map((_, i) => (
             <Card key={i} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214]">
               <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
@@ -164,24 +151,24 @@ export default function SuccursalesPage() {
           </div>
         ) : (
           filteredBranches.map((branch) => (
-            <Card key={branch.id} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] hover:shadow-md transition-shadow">
+            <Card key={branch.Idsuccursale} className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-bold">{branch.name}</CardTitle>
-                <Badge variant="outline" className="text-[10px] font-mono uppercase">{branch.city}</Badge>
+                <CardTitle className="text-lg font-bold">{branch.nom}</CardTitle>
+                <Badge variant="outline" className="text-[10px] font-mono uppercase">{branch.ville}</Badge>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <MapPin size={14} />
-                    <span>{branch.address}</span>
+                    <span>{branch.adresse}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <Phone size={14} />
-                    <span>{branch.phone}</span>
+                    <span>{branch.telephone}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-900 dark:text-zinc-300 font-medium pt-2 border-t border-zinc-100 dark:border-zinc-800">
                     <User size={14} className="text-primary" />
-                    <span>Manager: {users.find(u => u.id === branch.managerId)?.name || "Non assigné"}</span>
+                    <span>Manager: {branch.manager?.name || "Non assigné"}</span>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -203,27 +190,27 @@ export default function SuccursalesPage() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
+              <FormField control={form.control} name="nom" render={({ field }) => (
                 <FormItem><FormLabel>Nom de la succursale</FormLabel><FormControl><Input placeholder="Agence Sud - Goma" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
               )} />
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="city" render={({ field }) => (
+                <FormField control={form.control} name="ville" render={({ field }) => (
                   <FormItem><FormLabel>Ville</FormLabel><FormControl><Input placeholder="Goma" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="phone" render={({ field }) => (
+                <FormField control={form.control} name="telephone" render={({ field }) => (
                   <FormItem><FormLabel>Téléphone</FormLabel><FormControl><Input placeholder="+243..." {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <FormField control={form.control} name="address" render={({ field }) => (
+              <FormField control={form.control} name="adresse" render={({ field }) => (
                 <FormItem><FormLabel>Adresse Complète</FormLabel><FormControl><Input placeholder="Q. Les Volcans, Av. du Port n°12" {...field} className="bg-zinc-50 dark:bg-zinc-900" /></FormControl><FormMessage /></FormItem>
               )} />
               
-              <FormField control={form.control} name="managerId" render={({ field }) => (
+              <FormField control={form.control} name="Idmanager" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Responsable (Manager)</FormLabel>
                   <FormControl>
                     <Combobox
-                      options={users.map(u => ({ value: u.id, label: u.name }))}
+                      options={users.map(u => ({ value: u.id.toString(), label: u.name }))}
                       value={field.value || ""}
                       onChange={field.onChange}
                       placeholder="Assigner un responsable"
@@ -234,8 +221,11 @@ export default function SuccursalesPage() {
               )} />
 
               <DialogFooter className="pt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                <Button type="submit" className="bg-primary text-white">Confirmer la création</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} disabled={loading}>Annuler</Button>
+                <Button type="submit" className="bg-primary text-white" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmer la création
+                </Button>
               </DialogFooter>
             </form>
           </Form>

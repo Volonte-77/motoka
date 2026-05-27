@@ -1,31 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import localforage from "localforage";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Building2, ArrowRight, Zap, CheckCircle, KeyRound, UserPlus, LogIn, Sparkles } from "lucide-react";
-import { STORAGE_KEYS, AppUser, Agency, SubscriptionPlan, defaultAgencies } from "@/components/saas-mock";
+import { Building2, ArrowRight, Zap, CheckCircle, KeyRound, UserPlus, LogIn, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import apiClient from "@/lib/api-client";
+import { getHomeRouteByRole } from "@/lib/routing-middleware";
+import { toast } from "sonner";
 
 export default function LandingPage() {
   const router = useRouter();
-  const loginStore = useAuthStore((state) => state.login);
+  const { loginReel, login, loading: authLoading } = useAuthStore();
 
   // Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [isSeeded, setIsSeeded] = useState(false);
 
   // Inscription
   const [regAgencyName, setRegAgencyName] = useState("");
@@ -33,104 +34,71 @@ export default function LandingPage() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regCity, setRegCity] = useState("");
-  const [regPlan, setRegPlan] = useState<SubscriptionPlan>("Standard");
-
-  // Ensemencer localforage avec l'existant au premier chargement
-  useEffect(() => {
-    const seedDatabase = async () => {
-      const currentAgencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST);
-      if (!currentAgencies || currentAgencies.length === 0) {
-        await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, defaultAgencies);
-      }
-
-      const currentUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST);
-      if (!currentUsers || currentUsers.length === 0) {
-        const initialUsers: AppUser[] = [
-          { id: "USR-SUPER", name: "Alpha Volenium", email: "admin@motoka.cd", password: "admin", role: "Super Admin SaaS", agencyId: null, siteAccess: "Global" },
-          { id: "USR-KASONGO", name: "Papa Kasongo", email: "kasongo@mail.cd", password: "password", role: "Admin Agence", agencyId: "AGE-001", siteAccess: "Global" },
-          { id: "USR-CHAUFFEUR", name: "Chauffeur Kakule", email: "driver@mail.cd", password: "driver", role: "Chauffeur", agencyId: "AGE-001", siteAccess: "Bus C01" }
-        ];
-        await localforage.setItem(STORAGE_KEYS.USERS_LIST, initialUsers);
-      }
-      setIsSeeded(true);
-    };
-    seedDatabase();
-  }, []);
+  const [regTelephone, setRegTelephone] = useState("");
+  const [regPlan, setRegPlan] = useState<string>("starter");
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
-    if (!isSeeded) {
-      setLoginError("Initialisation en cours...");
-      return;
-    }
-
-    const allUsers = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-    const foundUser = allUsers.find(u => u.email === loginEmail && u.password === loginPassword);
-
-    if (foundUser) {
-      await loginStore({
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role,
-        agencyId: foundUser.agencyId,
-        siteAccess: foundUser.siteAccess
-      });
-      setIsLoginOpen(false);
-      if (foundUser.role === "Chauffeur") router.push("/courses");
-      else if (foundUser.role === "Super Admin SaaS") router.push("/super-admin");
-      else router.push("/dashboard");
-    } else {
-      setLoginError("Identifiants incorrects.");
+    try {
+      await loginReel(loginEmail.trim(), loginPassword.trim());
+      const user = useAuthStore.getState().user;
+      if (user) {
+        setIsLoginOpen(false);
+        router.push(getHomeRouteByRole(user.role));
+      }
+    } catch (error: any) {
+      setLoginError(error.message || "Identifiants incorrects.");
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newAgencyId = `AGE-${Math.floor(Math.random() * 900) + 100}`;
-    const newUserId = `USR-${Math.floor(Math.random() * 900) + 100}`;
+    setLoading(true);
 
-    const newAgency: Agency = {
-      id: newAgencyId,
-      name: regAgencyName,
-      email: regEmail,
-      city: regCity,
-      plan: regPlan,
-      status: "Actif",
-      expiresAt: "2026-12-31",
-      createdAt: "2026-05-20",
-      branches: [regCity + " Direction"]
-    };
+    try {
+      const response = await apiClient.post("/register-agence", {
+        agence_nom: regAgencyName,
+        agence_email: regEmail,
+        agence_telephone: regTelephone,
+        agence_adresse: regCity,
+        admin_name: regAdminName,
+        admin_email: regEmail,
+        admin_password: regPassword,
+        admin_telephone: regTelephone,
+        plan_enum: regPlan
+      });
 
-    const newAdmin: AppUser = {
-      id: newUserId,
-      name: regAdminName,
-      email: regEmail,
-      password: regPassword,
-      role: "Admin Agence",
-      agencyId: newAgencyId,
-      siteAccess: "Global"
-    };
+      const { admin, token } = response.data;
+      
+      // Auto-login après inscription
+      const mapRole = (role: string) => {
+        if (role === 'superAdmin') return "Super Admin SaaS";
+        if (role === 'adminAgence') return "Admin Agence";
+        return "Client";
+      };
 
-    const agencies = await localforage.getItem<Agency[]>(STORAGE_KEYS.AGENCIE_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.AGENCIE_LIST, [...agencies, newAgency]);
+      await login({
+        id: admin.id.toString(),
+        name: admin.name,
+        email: admin.email,
+        role: mapRole(admin.role_enum) as any,
+        agencyId: admin.Idagence.toString(),
+        branchId: null,
+        siteAccess: "Global",
+        token: token
+      } as any);
 
-    const users = await localforage.getItem<AppUser[]>(STORAGE_KEYS.USERS_LIST) || [];
-    await localforage.setItem(STORAGE_KEYS.USERS_LIST, [...users, newAdmin]);
-
-    await loginStore({
-      id: newAdmin.id,
-      name: newAdmin.name,
-      email: newAdmin.email,
-      role: newAdmin.role,
-      agencyId: newAgencyId,
-      siteAccess: "Global"
-    });
-
-    setIsRegisterOpen(false);
-    router.push("/dashboard");
+      toast.success("Votre agence a été créée avec succès !");
+      setIsRegisterOpen(false);
+      router.push("/dashboard");
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Erreur lors de la création de l'agence";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -210,20 +178,11 @@ export default function LandingPage() {
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Mot de passe</label>
               <Input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-11 px-4 rounded-xl text-sm" required />
             </div>
-            <Button type="submit" disabled={!isSeeded} className="w-full bg-primary text-white font-bold text-sm h-12 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 shadow-lg shadow-primary/20 hover:opacity-90 transition-all">
-              <LogIn size={16} className="mr-2"/> Se connecter au portail
+            <Button type="submit" disabled={authLoading} className="w-full bg-primary text-white font-bold text-sm h-12 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 shadow-lg shadow-primary/20 hover:opacity-90 transition-all">
+              {authLoading ? <Loader2 size={16} className="mr-2 animate-spin"/> : <LogIn size={16} className="mr-2"/>} 
+              Se connecter au portail
             </Button>
           </form>
-          <div className="text-[10px] text-zinc-400 dark:text-zinc-500 border-t border-zinc-100 dark:border-zinc-800 mt-4 pt-6 space-y-2 font-mono">
-            <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-              <span>Super Admin</span>
-              <span className="text-primary font-bold">admin@motoka.cd / admin</span>
-            </div>
-            <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-              <span>Agence Admin</span>
-              <span className="text-primary font-bold">kasongo@mail.cd / password</span>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
 
@@ -258,19 +217,23 @@ export default function LandingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email</label>
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Email Admin</label>
                 <Input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="admin@volenium.cd" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-11 px-4 rounded-xl text-sm" required />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Mot de passe</label>
-                <Input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-11 px-4 rounded-xl text-sm" required />
+                <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Téléphone</label>
+                <Input value={regTelephone} onChange={e => setRegTelephone(e.target.value)} placeholder="08..." className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-11 px-4 rounded-xl text-sm" required />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Mot de passe</label>
+              <Input type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="••••••••" className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-11 px-4 rounded-xl text-sm" required />
             </div>
 
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1 block">Niveau de licence</label>
               <div className="grid grid-cols-3 gap-3">
-                {(["Basique", "Standard", "Premium"] as const).map((plan) => (
+                {(["starter", "business", "enterprise"] as const).map((plan) => (
                   <div
                     key={plan} onClick={() => setRegPlan(plan)}
                     className={cn(
@@ -280,15 +243,16 @@ export default function LandingPage() {
                         : "border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-400"
                     )}
                   >
-                    <p className="text-xs font-black">{plan}</p>
-                    <p className="text-[10px] font-mono text-zinc-500">{plan === "Basique" ? "50$" : plan === "Standard" ? "120$" : "250$"}</p>
+                    <p className="text-[10px] font-black uppercase tracking-tighter">{plan}</p>
+                    <p className="text-[10px] font-mono text-zinc-500">{plan === "starter" ? "50$" : plan === "business" ? "120$" : "250$"}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <Button type="submit" className="w-full bg-primary text-white font-bold text-sm h-12 rounded-xl cursor-pointer shadow-lg shadow-primary/20 hover:opacity-90 transition-all mt-2">
-              <UserPlus size={16} className="mr-2"/> Déployer mon infrastructure
+            <Button type="submit" disabled={loading} className="w-full bg-primary text-white font-bold text-sm h-12 rounded-xl cursor-pointer shadow-lg shadow-primary/20 hover:opacity-90 transition-all mt-2">
+              {loading ? <Loader2 size={16} className="mr-2 animate-spin"/> : <UserPlus size={16} className="mr-2"/>} 
+              Déployer mon infrastructure
             </Button>
           </form>
         </DialogContent>
