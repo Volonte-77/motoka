@@ -17,48 +17,52 @@ Il est conseillé d'installer les outils suivants pour faciliter les appels API 
 
 ## 2. Authentification (Laravel Sanctum)
 
-Le système doit utiliser **Laravel Sanctum** (Token-based) pour l'authentification.
-
-### Flux de connexion
-1. **POST** `/login` : Envoie `email` et `password`.
-2. **Réponse** : Retourne un `token` et l'objet `user`.
-3. **Stockage** : Le token doit être stocké dans les cookies (pour le middleware) et passé dans le header `Authorization: Bearer <token>` pour chaque requête suivante.
+Le système utilise **Laravel Sanctum**.
 
 ### Mapping des Rôles
-Assurez-vous que les rôles envoyés par Laravel correspondent exactement aux types définis dans `types/index.ts` :
-- `Super Admin SaaS`
-- `Admin Agence`
-- `Admin Succursale`
-- etc.
+Il existe une différence entre les labels frontend et les enums backend :
+
+| Frontend Role | Backend `role_enum` |
+| :--- | :--- |
+| `Super Admin SaaS` | `superAdmin` |
+| `Admin Agence` | `adminAgence` |
+| `Dispatcher` | `dispatcher` |
+| `Chauffeur` | `chauffeur` |
+
+### Objet User & Session
+Le backend renvoie l'ID de l'agence via le champ `Idagence`. 
+**Attention :** Le frontend s'attend à `agencyId`. Un mapping sera nécessaire lors de la réception de l'objet `user`.
 
 ## 3. Multi-Tenancy (Cloisonnement)
 
-Le frontend gère le cloisonnement via `agencyId` et `branchId`. 
+Le backend utilise majoritairement `Idagence` (avec un 'I' majuscule et sans underscore) comme clé étrangère.
 
-### Stratégie de filtrage
-Deux approches sont possibles (à adapter selon le backend Laravel) :
-1. **Headers HTTP** (Recommandé) : Envoyer `X-Agency-ID` et `X-Branch-ID` dans chaque requête.
-2. **Paramètres URL** : Ajouter `?agency_id=...&branch_id=...` aux requêtes GET.
+### Clés Primaires Backend
+- Agence : `Idagence`
+- Véhicule : `Idvehicule`
+- Course : `Idcource` (Note: faute de frappe 'cource' dans la migration)
+- Colis : `Idcolis`
 
-## 4. Conventions de Données
+## 4. Mapping des Champs (Exemples)
 
-### Mapping des Noms (CamelCase vs SnakeCase)
-- **Laravel** utilise par défaut le `snake_case` (ex: `agency_id`, `created_at`).
-- **Next.js (Motoka)** utilise le `camelCase` (ex: `agencyId`, `createdAt`).
+| Entité | Champ Frontend | Champ Backend |
+| :--- | :--- | :--- |
+| **User** | `agencyId` | `Idagence` |
+| **User** | `role` | `role_enum` |
+| **Vehicle** | `plate` | `plaque` |
+| **Package** | `sender` | `nomExpediteur` |
+| **Package** | `receiver` | `nomDestinateur` |
 
-**Action requise :** Créer un utilitaire de transformation ou configurer les *Resources* Laravel pour renvoyer du `camelCase`.
+## 5. État actuel du Backend
 
-### Structure de Réponse API
-Toutes les réponses doivent suivre ce format :
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Action réussie"
-}
-```
+D'après l'analyse du dossier `backend-motoka` :
+- **Authentification** : Opérationnelle (`AuthController`).
+- **Agences** : Opérationnel (`AgenceController`).
+- **Véhicules** : Opérationnel (`VehiculeController`).
+- **Utilisateurs** : Opérationnel (`UserController`).
+- **Courses/Colis** : Les migrations existent mais les contrôleurs (`CourseControlleur`, `ColisController`) sont actuellement **vides**. Ils devront être implémentés pour que la liaison fonctionne.
 
-## 5. Mapping des Endpoints (Mock API -> Laravel)
+## 6. Mapping des Endpoints (Mock API -> Laravel)
 
 Remplacer les appels dans `lib/mock-api.ts` par les routes Laravel suivantes :
 
@@ -66,10 +70,10 @@ Remplacer les appels dans `lib/mock-api.ts` par les routes Laravel suivantes :
 | :--- | :--- | :--- | :--- |
 | `auth.login` | POST | `/login` | Authentification |
 | `agencies.getAll` | GET | `/agencies` | Liste des agences (SaaS Admin) |
-| `vehicles.getAll` | GET | `/vehicles` | Liste filtrée par agence/succursale |
-| `trips.save` | POST/PUT | `/trips` | Créer ou modifier une course |
-| `packages.save` | POST/PUT | `/packages` | Enregistrement de colis |
-| `cash.getAll` | GET | `/transactions` | Flux financier |
+| `vehicles.getAll` | GET | `/vehicules` | Liste filtrée |
+| `trips.save` | POST/PUT | `/courses` | (À implémenter côté backend) |
+| `packages.save` | POST/PUT | `/colis` | (À implémenter côté backend) |
+
 
 ## 6. Mode Offline & Synchronisation
 
