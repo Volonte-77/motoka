@@ -31,6 +31,7 @@ const mapBackendRoleToFrontend = (role: string): UserRole => {
     case 'adminAgence': return "Admin Agence";
     case 'dispatcher': return "Dispatcher";
     case 'chauffeur': return "Chauffeur";
+    case 'adminSuccursale': return "Admin Succursale";
     default: return "Client";
   }
 };
@@ -76,8 +77,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email: user.email,
         role: mapBackendRoleToFrontend(user.role_enum),
         agencyId: user.Idagence ? user.Idagence.toString() : null,
-        branchId: null,
-        siteAccess: user.role_enum === 'superAdmin' ? 'Global' : (user.agence?.nom || 'Agence'),
+        branchId: user.Idsuccursale ? user.Idsuccursale.toString() : null,
+        siteAccess: user.role_enum === 'superAdmin' 
+          ? 'Global' 
+          : (user.Idsuccursale ? user.succursale?.nom || 'Succursale' : user.agence?.nom || 'Agence'),
         token: token,
       };
 
