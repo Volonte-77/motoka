@@ -149,6 +149,7 @@ export default function UtilisateursPage() {
         // Déterminer la route selon le rôle
         let route = "/admin/users/dispatcher";
         if (values.role_enum === 'adminAgence') route = "/admin/users/admin-agence";
+        else if (values.role_enum === 'adminSuccursale') route = "/admin/users/admin-succursale";
         
         await apiClient.post(route, {
           ...payload,
