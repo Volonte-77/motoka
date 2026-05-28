@@ -48,6 +48,7 @@ export default function SuccursalesPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingBranch, setEditingBranch] = useState<any>(null);
 
   const form = useForm<BranchFormValues>({
     resolver: zodResolver(branchSchema),
@@ -80,6 +81,18 @@ export default function SuccursalesPage() {
     loadData();
   }, []);
 
+  const handleEdit = (branch: any) => {
+    setEditingBranch(branch);
+    form.reset({
+      nom: branch.nom || "",
+      ville: branch.ville || "",
+      adresse: branch.adresse || "",
+      telephone: branch.telephone || "",
+      Idmanager: branch.Idmanager?.toString() || "",
+    });
+    setIsDialogOpen(true);
+  };
+
   const onSubmit = async (values: BranchFormValues) => {
     try {
       setLoading(true);
@@ -88,14 +101,20 @@ export default function SuccursalesPage() {
         Idmanager: values.Idmanager === "" ? null : values.Idmanager,
       };
 
-      await apiClient.post("/succursales", payload);
+      if (editingBranch) {
+        await apiClient.put(`/succursales/${editingBranch.Idsuccursale}`, payload);
+        toast.success(`La succursale ${values.nom} a été mise à jour`);
+      } else {
+        await apiClient.post("/succursales", payload);
+        toast.success(`La succursale ${values.nom} a été créée`);
+      }
       
       await loadData();
       setIsDialogOpen(false);
+      setEditingBranch(null);
       form.reset();
-      toast.success(`La succursale ${values.nom} a été créée`);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Erreur lors de la création");
+      toast.error(error.response?.data?.message || "Erreur lors de l'opération");
     } finally {
       setLoading(false);
     }
@@ -113,7 +132,17 @@ export default function SuccursalesPage() {
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-zinc-900 dark:text-white">Nos Succursales</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Gérez les points de service de votre agence et leurs responsables.</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white">
+        <Button onClick={() => {
+          setEditingBranch(null);
+          form.reset({
+            nom: "",
+            ville: "",
+            adresse: "",
+            telephone: "",
+            Idmanager: "",
+          });
+          setIsDialogOpen(true);
+        }} className="bg-primary text-white">
           <Plus className="mr-2 h-4 w-4" /> Créer une succursale
         </Button>
       </div>
@@ -172,7 +201,7 @@ export default function SuccursalesPage() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" className="h-8 text-xs">Modifier</Button>
+                  <Button onClick={() => handleEdit(branch)} variant="ghost" size="sm" className="h-8 text-xs">Modifier</Button>
                   <Button variant="outline" size="sm" className="h-8 text-xs text-primary">Voir Rapports</Button>
                 </div>
               </CardContent>
@@ -181,11 +210,19 @@ export default function SuccursalesPage() {
         )}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) {
+          setEditingBranch(null);
+          form.reset();
+        }
+      }}>
         <DialogContent className="sm:max-w-[500px] bg-white dark:bg-[#121214] border-zinc-200 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle>Nouvelle Succursale</DialogTitle>
-            <DialogDescription>Ajoutez un nouveau point de service à votre réseau.</DialogDescription>
+            <DialogTitle>{editingBranch ? "Modifier la succursale" : "Nouvelle Succursale"}</DialogTitle>
+            <DialogDescription>
+              {editingBranch ? "Mettez à jour les informations de ce point de service." : "Ajoutez un nouveau point de service à votre réseau."}
+            </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
