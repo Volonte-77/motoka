@@ -23,9 +23,12 @@ export type SubscriptionStatus = "Actif" | "Essai" | "Expiré";
 
 export type TripStatus = "Planifiée" | "En cours" | "Terminée" | "Annulée";
 export type VehicleStatus = "Disponible" | "Mission" | "Maintenance" | "Hors service";
+export type VehicleOwnership = "Agence" | "Partenaire";
+export type DriverType = "Salarié" | "Adhérent";
 export type PackageStatus = "En attente" | "En transit" | "Livré" | "Annulé";
+export type PaymentMode = "Agence" | "Chauffeur";
 export type CashTransactionType = "Entrée" | "Sortie";
-export type CashCategory = "Billet" | "Fret" | "Carburant" | "Maintenance" | "Autre";
+export type CashCategory = "Billet" | "Fret" | "Commission" | "Salaire" | "Carburant" | "Maintenance" | "Autre";
 
 // ============================================================================
 // UTILISATEURS & AUTHENTIFICATION
@@ -59,6 +62,7 @@ export interface AppUser extends SessionUser {
   license?: string;
   status?: VehicleStatus;
   rating?: string;
+  driverType?: DriverType;         // Salarié ou Adhérent
 }
 
 // ============================================================================
@@ -98,7 +102,8 @@ export interface Vehicle {
   plate: string;
   type: "Bus" | "Taxi" | "Camion" | "Moto" | "Autre";
   status: VehicleStatus;
-  owner: "Agence Interne" | "Chauffeur Partenaire" | string;
+  ownership: VehicleOwnership;    // Agence ou Partenaire
+  ownerName?: string;             // Nom du propriétaire si Partenaire
   mileage: string;
   lastService: string;
   agencyId: string;                // Cloisonnement: propriétaire agence
@@ -123,6 +128,7 @@ export interface Trip {
   load: string;                    // Description du fret
   agencyId: string;                // Cloisonnement multi-agence
   branchId: string | null;         // Succursale de départ
+  commissionAgency?: number;       // Frais payés à l'agence (CDF) si Partenaire
 }
 
 // ============================================================================
@@ -138,7 +144,9 @@ export interface Package {
   route: string;
   status: PackageStatus;
   weight: string;
-  value: string;
+  value: string;                   // Valeur déclarée (CDF)
+  price: number;                   // Prix du transport (CDF)
+  paymentMode: PaymentMode;        // Payé à l'Agence ou au Chauffeur
   otp: string;                     // One-Time Password pour vérification à la livraison
   agencyId: string;                // Cloisonnement multi-agence
   branchId: string | null;         // Succursale d'enregistrement
