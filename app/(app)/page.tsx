@@ -37,7 +37,7 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium text-zinc-400">Recettes du jour</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">450 000 FCFA</div>
+              <div className="text-2xl font-bold text-primary">450 000 CDF</div>
               <p className="text-xs text-zinc-500">Objectif atteint à 85%</p>
             </CardContent>
           </Card>

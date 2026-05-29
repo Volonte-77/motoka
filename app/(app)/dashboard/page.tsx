@@ -142,7 +142,7 @@ export default function DashboardPage() {
           <Skeleton className="h-8 w-24" />
         ) : (
           <div className="text-2xl font-bold text-zinc-900 dark:text-white">
-            {typeof value === 'number' && title.includes('Recettes') ? value.toLocaleString() + ' FCFA' : value}
+            {typeof value === 'number' && title.includes('Recettes') ? value.toLocaleString() + ' CDF' : value}
           </div>
         )}
         <p className="text-[10px] text-zinc-500 mt-1 truncate font-medium">{description}</p>

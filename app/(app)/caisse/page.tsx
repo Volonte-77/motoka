@@ -213,7 +213,7 @@ export default function CaissePage() {
             <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform"><Banknote className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground tabular-nums">{(totals.in - totals.out).toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{(totals.in - totals.out).toLocaleString()} <span className="text-xs font-medium opacity-50">CDF</span></div>
             <p className="text-[10px] text-muted-foreground mt-1 font-medium italic">Résultat net sur la journée sélectionnée</p>
           </CardContent>
         </Card>
@@ -223,7 +223,7 @@ export default function CaissePage() {
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><TrendingUp className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-500 tabular-nums">{totals.in.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <div className="text-2xl font-bold text-emerald-500 tabular-nums">{totals.in.toLocaleString()} <span className="text-xs font-medium opacity-50">CDF</span></div>
             <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-tighter">Total entrées</p>
           </CardContent>
         </Card>
@@ -233,7 +233,7 @@ export default function CaissePage() {
             <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500"><TrendingDown className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-500 tabular-nums">{totals.out.toLocaleString()} <span className="text-xs font-medium opacity-50">FCFA</span></div>
+            <div className="text-2xl font-bold text-rose-500 tabular-nums">{totals.out.toLocaleString()} <span className="text-xs font-medium opacity-50">CDF</span></div>
             <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-tighter">Total sorties</p>
           </CardContent>
         </Card>
@@ -321,7 +321,7 @@ export default function CaissePage() {
                       t.type === "Entrée" ? "text-emerald-500" : "text-rose-500"
                     )}>
                       {t.type === "Entrée" ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
-                      {t.amount.toLocaleString()} <span className="text-[9px] font-medium opacity-60">FCFA</span>
+                      {t.amount.toLocaleString()} <span className="text-[9px] font-medium opacity-60">CDF</span>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -339,7 +339,7 @@ export default function CaissePage() {
             </div>
             <div className="text-sm font-bold text-foreground">
               Total Net : <span className={cn(totals.in - totals.out >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                {(totals.in - totals.out).toLocaleString()} FCFA
+                {(totals.in - totals.out).toLocaleString()} CDF
               </span>
             </div>
           </div>
@@ -376,7 +376,7 @@ export default function CaissePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="amount" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Montant (FCFA)</FormLabel><FormControl><Input type="number" {...field} className="bg-muted/30 border-border font-bold text-foreground" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Montant (CDF)</FormLabel><FormControl><Input type="number" {...field} className="bg-muted/30 border-border font-bold text-foreground" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="category" render={({ field }) => (
                   <FormItem>

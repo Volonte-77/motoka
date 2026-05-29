@@ -86,7 +86,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label>Devise par défaut</Label>
                 <div className="p-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-sm font-medium">
-                  FCFA (Franc Congolais)
+                  CDF (Franc Congolais)
                 </div>
               </div>
             </div>

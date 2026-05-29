@@ -65,7 +65,7 @@ export default function PlansPage() {
               <CardContent className="flex-1 space-y-6">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold">{plan.price}</span>
-                  <span className="text-zinc-500 text-sm">FCFA / mois</span>
+                  <span className="text-zinc-500 text-sm">CDF / mois</span>
                 </div>
                 <ul className="space-y-3">
                   {plan.features.map((feature) => (

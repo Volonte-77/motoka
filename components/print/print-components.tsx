@@ -195,15 +195,15 @@ export const A4FinancialReport = React.forwardRef<HTMLDivElement, { data: any }>
         <div className="bg-zinc-900 text-white p-8 rounded-3xl grid grid-cols-3 gap-8 mb-12 shadow-2xl">
           <div className="space-y-1">
             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Recettes Totales</p>
-            <p className="text-2xl font-black text-emerald-400">{data.totals.in.toLocaleString()} FCFA</p>
+            <p className="text-2xl font-black text-emerald-400">{data.totals.in.toLocaleString()} CDF</p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Dépenses Totales</p>
-            <p className="text-2xl font-black text-rose-400">{data.totals.out.toLocaleString()} FCFA</p>
+            <p className="text-2xl font-black text-rose-400">{data.totals.out.toLocaleString()} CDF</p>
           </div>
           <div className="space-y-1 border-l border-zinc-800 pl-8">
             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Résultat Net</p>
-            <p className="text-2xl font-black">{(data.totals.in - data.totals.out).toLocaleString()} FCFA</p>
+            <p className="text-2xl font-black">{(data.totals.in - data.totals.out).toLocaleString()} CDF</p>
           </div>
         </div>
 
@@ -215,7 +215,7 @@ export const A4FinancialReport = React.forwardRef<HTMLDivElement, { data: any }>
                 <th className="py-4">ID</th>
                 <th className="py-4">Désignation</th>
                 <th className="py-4">Catégorie</th>
-                <th className="py-4 text-right">Montant (FCFA)</th>
+                <th className="py-4 text-right">Montant (CDF)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">

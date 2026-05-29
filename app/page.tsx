@@ -244,7 +244,7 @@ export default function LandingPage() {
                     )}
                   >
                     <p className="text-[10px] font-black uppercase tracking-tighter">{plan}</p>
-                    <p className="text-[10px] font-mono text-zinc-500">{plan === "starter" ? "50$" : plan === "business" ? "120$" : "250$"}</p>
+                    <p className="text-[10px] font-mono text-zinc-500">{plan === "starter" ? "50 CDF" : plan === "business" ? "120 CDF" : "250 CDF"}</p>
                   </div>
                 ))}
               </div>

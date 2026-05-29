@@ -161,7 +161,7 @@ export default function SuperAdminDashboard() {
         />
         <StatCard 
           title="Revenu Global" 
-          value={`${stats.globalRevenue} FCFA`} 
+          value={`${stats.globalRevenue} CDF`} 
           icon={TrendingUp} 
           color="bg-emerald-500/10 text-emerald-500"
           description="Volume d'affaires mensuel"
