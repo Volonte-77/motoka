@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Download } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Printer } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
 import { Trip, TripStatus, Vehicle, AppUser, Branch, Agency } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -39,8 +39,8 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import { TripTicket } from "@/components/print-templates";
+import { useReactToPrint } from "react-to-print";
+import { A4Invoice } from "@/components/print/print-components";
 
 const tripSchema = z.object({
   route: z.string().min(5, "L'itinéraire est requis"),
@@ -67,6 +67,22 @@ export default function CoursesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isClient, setIsClient] = useState(false);
+
+  // ÉTATS POUR L'IMPRESSION CIBLÉE (A4)
+  const printRef = useRef<HTMLDivElement>(null);
+  const [selectedTripForPrint, setSelectedTripForPrint] = useState<Trip | null>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Ticket_Course_${selectedTripForPrint?.id}`,
+  });
+
+  const triggerPrint = (trip: Trip) => {
+    setSelectedTripForPrint(trip);
+    setTimeout(() => {
+      handlePrint();
+    }, 150);
+  };
 
   useEffect(() => { setIsClient(true); }, []);
 
@@ -151,25 +167,23 @@ export default function CoursesPage() {
 
   return (
     <div className="space-y-6">
+      {/* COMPOSANT CACHÉ POUR L'IMPRESSION (A4) */}
+      <div className="hidden">
+        {agency && selectedTripForPrint && (
+          <A4Invoice ref={printRef} trip={selectedTripForPrint} agency={agency} />
+        )}
+      </div>
+
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl text-foreground uppercase tracking-tighter">
-            {user?.role === "Admin Succursale" ? "Planning des Courses" : "Flux des Courses"}
+            Planning des Courses
           </h1>
           <p className="text-sm text-muted-foreground">
-            {user?.role === "Admin Succursale" 
-              ? `Vols et trajets au départ de ${branches.find(b => b.id === user.branchId)?.name || "votre succursale"}.` 
-              : "Vue globale des mouvements de la flotte."}
+            Vue globale et gestion opérationnelle des mouvements.
           </p>
         </div>
-        <Button onClick={() => {
-          form.reset({
-            route: "", driverId: "", vehicleId: "", departureTime: new Date().toISOString().slice(0, 16),
-            eta: "Env. 4 heures", passengers: 0, load: "", status: "Planifiée",
-            branchId: user?.role === "Admin Succursale" ? user.branchId || "global" : "global"
-          });
-          setIsDialogOpen(true);
-        }} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shadow-sm">
+        <Button onClick={() => setIsDialogOpen(true)} className="bg-primary text-white hover:bg-primary/90 font-bold">
           <Plus className="mr-2 h-4 w-4" /> Nouvelle Course
         </Button>
       </div>
@@ -193,7 +207,7 @@ export default function CoursesPage() {
           <div className="space-y-3">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="border-border bg-card"><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+                <Card key={i} className="p-4"><Skeleton className="h-20 w-full" /></Card>
               ))
             ) : filteredTrips.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-xl">
@@ -201,49 +215,33 @@ export default function CoursesPage() {
               </div>
             ) : (
               filteredTrips.map((trip) => (
-                <Card key={trip.id} className="border-border bg-card hover:border-primary/50 transition-colors group cursor-pointer shadow-sm">
+                <Card key={trip.id} className="border-border bg-card hover:border-primary/50 transition-colors group cursor-pointer shadow-sm" onClick={() => triggerPrint(trip)}>
                   <CardContent className="p-5">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary">
                             <MapPin size={18} />
                           </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-lg text-foreground leading-none tracking-tight">{trip.route}</span>
-                            {user?.role === "Admin Agence" && (
-                              <span className="text-[9px] font-bold text-muted-foreground mt-1 uppercase tracking-widest bg-muted/50 w-fit px-1.5 py-0.5 rounded">Site: {branches.find(b => b.id === trip.branchId)?.name || "Siège"}</span>
-                            )}
+                          <div>
+                            <span className="font-bold text-lg text-foreground tracking-tight">{trip.route}</span>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                          <div className="flex items-center gap-1.5"><Clock size={12} className="text-primary/60" /> {trip.departureTime.replace("T", " à ")}</div>
-                          <div className="flex items-center gap-1.5"><UsersIcon size={12} className="text-primary/60" /> {trip.passengers} PAX</div>
+                          <div className="flex items-center gap-1.5"><Clock size={12} /> {trip.departureTime.replace("T", " à ")}</div>
+                          <div className="flex items-center gap-1.5"><UsersIcon size={12} /> {trip.passengers} PAX</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-right hidden md:block">
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Responsable</p>
-                          <p className="text-sm font-bold text-foreground">{trip.driver}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{trip.vehicle}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{trip.driver}</p>
+                          <p className="text-[10px] text-zinc-400 font-mono">{trip.vehicle}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           {getStatusBadge(trip.status)}
-                          <div className="flex items-center gap-2">
-                            {isClient && agency && (
-                              <PDFDownloadLink
-                                document={<TripTicket trip={trip} agency={agency} />}
-                                fileName={`Ticket_Course_${trip.id}.pdf`}
-                              >
-                                {({ loading }) => (
-                                  <Button variant="outline" size="icon" className="h-8 w-8 border-border hover:bg-primary hover:text-white" disabled={loading} onClick={(e) => e.stopPropagation()}>
-                                    <Download size={14} />
-                                  </Button>
-                                )}
-                              </PDFDownloadLink>
-                            )}
-                            <ChevronRight size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
+                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-primary hover:text-white" onClick={(e) => { e.stopPropagation(); triggerPrint(trip); }}>
+                            <Printer size={14} />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -254,23 +252,15 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        <div className="md:col-span-4 space-y-6">
-          <Card className="border-border bg-card shadow-sm overflow-hidden">
+        <div className="md:col-span-4">
+          <Card className="border-border bg-card shadow-sm">
             <CardHeader className="bg-muted/30 border-b border-border">
-              <CardTitle className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Statistiques Planning</CardTitle>
+              <CardTitle className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Stats Planning</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
                 <span className="text-xs font-bold text-muted-foreground uppercase">Mouvements</span>
-                <span className="font-bold text-xl text-foreground">{trips.length}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">Terminés</span>
-                <span className="font-bold text-xl text-emerald-600 dark:text-emerald-400">{trips.filter(t => t.status === "Terminée").length}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase">En cours</span>
-                <span className="font-bold text-xl text-amber-600 dark:text-amber-400">{trips.filter(t => t.status === "En cours").length}</span>
+                <span className="font-bold text-xl">{trips.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -278,55 +268,23 @@ export default function CoursesPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-card border-border shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-bold text-xl text-foreground">Planification Course</DialogTitle>
-            <DialogDescription className="text-muted-foreground">Initialisez un nouveau trajet avec chauffeur et véhicule.</DialogDescription>
-          </DialogHeader>
-
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader><DialogTitle>Planification Course</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField control={form.control} name="route" render={({ field }) => (
-                <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Itinéraire</FormLabel><FormControl><Input placeholder="Ex: Goma → Bukavu" {...field} className="bg-muted/30 border-border" /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel className="text-xs uppercase font-bold">Itinéraire</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-
-              <FormField control={form.control} name="branchId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Site de départ</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      options={[{ value: "global", label: "Agence Centrale / Siège" }, ...branches.map(b => ({ value: b.id, label: b.name }))]}
-                      value={field.value || "global"}
-                      onChange={field.onChange}
-                      disabled={user?.role === "Admin Succursale"}
-                    />
-                  </FormControl>
-                  {user?.role === "Admin Succursale" && <p className="text-[10px] text-muted-foreground mt-1 italic">Verrouillé sur votre planning local.</p>}
-                  <FormMessage />
-                </FormItem>
-              )} />
-
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="driverId" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Chauffeur (Disponible)</FormLabel><FormControl><Combobox options={drivers.map(d => ({ value: d.id, label: d.name }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel className="text-xs uppercase font-bold">Chauffeur</FormLabel><FormControl><Combobox options={drivers.map(d => ({ value: d.id, label: d.name }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="vehicleId" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Véhicule (Disponible)</FormLabel><FormControl><Combobox options={vehicles.map(v => ({ value: v.id, label: `${v.model} (${v.plate})` }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel className="text-xs uppercase font-bold">Véhicule</FormLabel><FormControl><Combobox options={vehicles.map(v => ({ value: v.id, label: `${v.model} (${v.plate})` }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="departureTime" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Date & Heure</FormLabel><FormControl><Input type="datetime-local" {...field} className="bg-muted/30 border-border font-mono text-xs" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="passengers" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Nb Passagers</FormLabel><FormControl><Input type="number" {...field} className="bg-muted/30 border-border font-bold" /></FormControl><FormMessage /></FormItem>
-                )} />
-              </div>
-
-              <DialogFooter className="pt-4 gap-2">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="hover:bg-muted font-medium">Annuler</Button>
-                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8">Confirmer le départ</Button>
+              <DialogFooter>
+                <Button type="submit" className="w-full font-bold">Confirmer le départ</Button>
               </DialogFooter>
             </form>
           </Form>

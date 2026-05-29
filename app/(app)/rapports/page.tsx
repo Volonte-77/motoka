@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -18,79 +18,14 @@ import {
 import { 
   ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig
 } from "@/components/ui/chart";
-import { 
-  PDFDownloadLink, Document, Page, Text, View, StyleSheet 
-} from "@react-pdf/renderer";
 import { useAuthStore } from "@/store/useAuthStore";
 import { mockApi } from "@/lib/mock-api";
-import { Branch } from "@/types";
+import { Branch, CashTransaction } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
-// --- STYLES PROFESSIONNELS POUR LE PDF ---
-const pdfStyles = StyleSheet.create({
-  page: { padding: 40, backgroundColor: "#ffffff", fontFamily: "Helvetica" },
-  header: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#10b981", paddingBottom: 20, marginBottom: 30 },
-  agencyName: { fontSize: 20, fontWeight: "bold", color: "#10b981", textTransform: "uppercase" },
-  reportTitle: { fontSize: 16, fontWeight: "bold", color: "#18181b" },
-  reportRef: { fontSize: 7, color: "#a1a1aa", marginTop: 4 },
-  infoBox: { backgroundColor: "#f8fafc", padding: 15, borderRadius: 8, borderWidth: 1, borderColor: "#e2e8f0", flexDirection: "row", justifyContent: "space-between", marginBottom: 30 },
-  infoLabel: { fontSize: 7, textTransform: "uppercase", color: "#94a3b8", fontWeight: "bold" },
-  infoValue: { fontSize: 10, color: "#1e293b", fontWeight: "bold" },
-  kpiContainer: { flexDirection: "row", gap: 10, marginBottom: 40 },
-  kpiCard: { flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: "#e2e8f0" },
-  kpiTitle: { fontSize: 7, textTransform: "uppercase", color: "#64748b", marginBottom: 5 },
-  kpiValue: { fontSize: 14, fontWeight: "bold" },
-  table: { marginBottom: 50 },
-  tableHeader: { flexDirection: "row", backgroundColor: "#f1f5f9", borderBottomWidth: 1, borderBottomColor: "#cbd5e1", paddingVertical: 8, paddingHorizontal: 5 },
-  tableHeaderCol: { fontSize: 8, fontWeight: "bold", color: "#475569", textTransform: "uppercase" },
-  tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#f1f5f9", paddingVertical: 8, paddingHorizontal: 5 },
-  tableCell: { fontSize: 9, color: "#334155" },
-  footer: { marginTop: "auto", paddingTop: 20, borderTopWidth: 1, borderTopColor: "#e2e8f0", flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  stampBox: { width: 100, height: 50, borderWidth: 1, borderColor: "#e2e8f0", borderRadius: 4, justifyContent: "center", alignItems: "center", fontSize: 8, color: "#cbd5e1" }
-});
-
-// --- COMPOSANT DOCUMENT PDF ---
-const FinancialReportDoc = ({ data, type }: any) => (
-  <Document>
-    <Page size="A4" style={pdfStyles.page}>
-      <View style={pdfStyles.header}>
-        <View><Text style={pdfStyles.agencyName}>{data.agencyName}</Text></View>
-        <View style={{ textAlign: "right" }}><Text style={pdfStyles.reportTitle}>RAPPORT {type.toUpperCase()}</Text><Text style={pdfStyles.reportRef}>MOT-REP-{Date.now().toString().slice(-6)}</Text></View>
-      </View>
-      <View style={pdfStyles.infoBox}>
-        <View><Text style={pdfStyles.infoLabel}>Unité d'Exploitation</Text><Text style={pdfStyles.infoValue}>{data.branchName}</Text></View>
-        <View style={{ textAlign: "right" }}><Text style={pdfStyles.infoLabel}>Date du Rapport</Text><Text style={pdfStyles.infoValue}>{data.date}</Text></View>
-      </View>
-      <View style={pdfStyles.kpiContainer}>
-        <View style={[pdfStyles.kpiCard, { backgroundColor: "#f0fdf4" }]}><Text style={pdfStyles.kpiTitle}>Recettes</Text><Text style={[pdfStyles.kpiValue, { color: "#166534" }]}>{data.totals.in.toLocaleString()} FCFA</Text></View>
-        <View style={[pdfStyles.kpiCard, { backgroundColor: "#fef2f2" }]}><Text style={pdfStyles.kpiTitle}>Dépenses</Text><Text style={[pdfStyles.kpiValue, { color: "#991b1b" }]}>{data.totals.out.toLocaleString()} FCFA</Text></View>
-        <View style={[pdfStyles.kpiCard, { backgroundColor: "#18181b" }]}><Text style={[pdfStyles.kpiTitle, { color: "#a1a1aa" }]}>Résultat Net</Text><Text style={[pdfStyles.kpiValue, { color: "#ffffff" }]}>{(data.totals.in - data.totals.out).toLocaleString()} FCFA</Text></View>
-      </View>
-      <View style={pdfStyles.table}>
-        <View style={pdfStyles.tableHeader}>
-          <Text style={[pdfStyles.tableHeaderCol, { width: "15%" }]}>ID</Text>
-          <Text style={[pdfStyles.tableHeaderCol, { width: "50%" }]}>Désignation</Text>
-          <Text style={[pdfStyles.tableHeaderCol, { width: "15%" }]}>Catégorie</Text>
-          <Text style={[pdfStyles.tableHeaderCol, { width: "20%", textAlign: "right" }]}>Montant</Text>
-        </View>
-        {data.transactions.map((t: any, i: number) => (
-          <View key={i} style={pdfStyles.tableRow}>
-            <Text style={[pdfStyles.tableCell, { width: "15%" }]}>{t.id}</Text>
-            <Text style={[pdfStyles.tableCell, { width: "50%" }]}>{t.desc}</Text>
-            <Text style={[pdfStyles.tableCell, { width: "15%" }]}>{t.cat}</Text>
-            <Text style={[pdfStyles.tableCell, { width: "20%", textAlign: "right" }]}>{t.amount.toLocaleString()}</Text>
-          </View>
-        ))}
-      </View>
-      <View style={pdfStyles.footer}>
-        <View><Text style={{ fontSize: 7, fontWeight: "bold" }}>DOCUMENT CERTIFIÉ</Text></View>
-        <View style={pdfStyles.stampBox}><Text>Cachet & Signature</Text></View>
-      </View>
-    </Page>
-  </Document>
-);
+import { useReactToPrint } from "react-to-print";
+import { A4FinancialReport } from "@/components/print/print-components";
 
 export default function RapportsPage() {
   const { user } = useAuthStore();
@@ -104,6 +39,13 @@ export default function RapportsPage() {
   useEffect(() => { setIsClient(true); }, []);
 
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+
+  // ÉTATS POUR L'IMPRESSION CIBLÉE (A4)
+  const reportRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: reportRef,
+    documentTitle: `Rapport_Financier_${new Date().toISOString().split('T')[0]}`,
+  });
 
   useEffect(() => {
     const init = async () => {
@@ -173,6 +115,11 @@ export default function RapportsPage() {
 
   return (
     <div className="space-y-6">
+      {/* COMPOSANT CACHÉ POUR L'IMPRESSION CIBLÉE */}
+      <div className="hidden">
+        <A4FinancialReport ref={reportRef} data={reportData} />
+      </div>
+
       <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch animate-in fade-in slide-in-from-top-4 duration-700">
         <Card className="lg:w-1/3 border-border bg-card shadow-xl overflow-hidden flex flex-col">
           <div className="p-6 border-b border-border bg-muted/30"><h1 className="text-2xl font-bold tracking-tight text-foreground uppercase tracking-tighter">Moteur Analytique</h1><p className="text-xs text-muted-foreground font-medium mt-1 uppercase tracking-widest">Configuration du Bilan</p></div>
@@ -183,17 +130,10 @@ export default function RapportsPage() {
             </div>
             <div className="pt-6 space-y-3">
               <Button onClick={() => setIsPreviewOpen(true)} className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-black uppercase text-xs tracking-widest h-12 gap-2 shadow-lg"><Eye size={16} /> Prévisualiser le Bilan</Button>
-              {(isPreviewOpen && isClient) && (
-                <PDFDownloadLink
-                  document={<FinancialReportDoc data={reportData} type={reportType} />}
-                  fileName={`Rapport_${reportData.branchName.replace(/\s+/g, '_')}_${reportType}.pdf`}
-                >
-                  {({ loading }) => (
-                    <Button disabled={loading} variant="outline" className="w-full border-primary/50 text-primary font-black uppercase text-xs tracking-widest h-12 gap-2 hover:bg-primary/5">
-                      <Download size={16} /> {loading ? "Génération..." : "Télécharger PDF (A4)"}
-                    </Button>
-                  )}
-                </PDFDownloadLink>
+              {isPreviewOpen && (
+                <Button onClick={() => handlePrint()} className="w-full border-primary/50 text-primary font-black uppercase text-xs tracking-widest h-12 gap-2 hover:bg-primary/5" variant="outline">
+                  <Printer size={16} /> Imprimer Format A4
+                </Button>
               )}
             </div>
           </CardContent>
@@ -201,7 +141,6 @@ export default function RapportsPage() {
         </Card>
         <div className="lg:w-2/3 flex flex-col gap-6">{!isPreviewOpen ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full"><Card className="border-border bg-card shadow-sm flex flex-col"><CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-black text-muted-foreground tracking-widest flex items-center gap-2"><PieIcon size={14} className="text-primary" /> Répartition Revenus</CardTitle></CardHeader><CardContent className="flex-1 min-h-[300px] flex items-center justify-center"><div className="flex flex-col items-center text-center opacity-20 space-y-4"><TrendingUp size={48} /><p className="text-xs font-bold uppercase tracking-widest">Générez une prévisualisation<br/>pour voir les analytiques</p></div></CardContent></Card><Card className="border-border bg-card shadow-sm flex flex-col"><CardHeader className="pb-2"><CardTitle className="text-xs uppercase font-black text-muted-foreground tracking-widest flex items-center gap-2"><TableIcon size={14} className="text-primary" /> Audit de Caisse</CardTitle></CardHeader><CardContent className="flex-1 flex flex-col justify-center space-y-4 p-8"><div className="space-y-4"><div className="h-2 bg-muted rounded-full w-full" /><div className="h-2 bg-muted rounded-full w-[80%]" /><div className="h-2 bg-muted rounded-full w-[60%]" /><div className="h-2 bg-muted rounded-full w-[90%]" /></div><p className="text-[10px] text-muted-foreground text-center font-medium italic mt-4">Sélectionnez les filtres pour extraire le grand livre comptable.</p></CardContent></Card></div>) : (<ReportPreview />)}</div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/10"><CheckCircle2 size={18} className="text-primary mt-0.5" /><div><p className="text-xs font-bold text-foreground leading-none">Format Certifié</p><p className="text-[10px] text-muted-foreground mt-1">Tous les exports respectent les normes comptables OHADA standard.</p></div></div><div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/10"><AlertCircle size={18} className="text-amber-500 mt-0.5" /><div><p className="text-xs font-bold text-foreground leading-none">Vérification Requise</p><p className="text-[10px] text-muted-foreground mt-1">Veuillez prévisualiser le document avant toute impression officielle.</p></div></div><div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/5 border border-blue-500/10"><Printer size={18} className="text-blue-500 mt-0.5" /><div><p className="text-xs font-bold text-foreground leading-none">Prêt pour Impression</p><p className="text-[10px] text-muted-foreground mt-1">Optimisé for les formats A4 portrait avec marges de reliure.</p></div></div></div>
     </div>
   );
 }
