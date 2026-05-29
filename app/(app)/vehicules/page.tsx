@@ -52,6 +52,8 @@ const vehicleSchema = z.object({
   Idsuccursale: z.string().optional(),
   CapacitePassagers: z.string().min(1, "Capacité requise"),
   Capacite: z.string().min(1, "Capacité totale requise"),
+  proprietaire_type: z.enum(["agence", "chauffeur"]),
+  Idchauffeur: z.string().optional(),
 });
 
 type VehicleFormValues = z.infer<typeof vehicleSchema>;
@@ -60,6 +62,7 @@ export default function VehiculesPage() {
   const { user } = useAuthStore();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<any | null>(null);
@@ -79,20 +82,24 @@ export default function VehiculesPage() {
       Idsuccursale: "global",
       CapacitePassagers: "15",
       Capacite: "15",
+      proprietaire_type: "agence",
+      Idchauffeur: "",
     },
   });
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [vehRes, branchesRes] = await Promise.all([
+      const [vehRes, branchesRes, driversRes] = await Promise.all([
         apiClient.get("/vehicules"),
-        apiClient.get("/succursales")
+        apiClient.get("/succursales"),
+        apiClient.get("/admin/chauffeurs")
       ]);
       setVehicles(vehRes.data.data || vehRes.data);
       setBranches(branchesRes.data);
+      setDrivers(driversRes.data.data || driversRes.data);
     } catch (error) {
-      toast.error("Erreur lors du chargement des véhicules");
+      toast.error("Erreur lors du chargement des données");
     } finally {
       setLoading(false);
     }
@@ -111,6 +118,7 @@ export default function VehiculesPage() {
         CapacitePassagers: parseInt(values.CapacitePassagers),
         Capacite: parseInt(values.Capacite),
         Idsuccursale: values.Idsuccursale === "global" ? null : values.Idsuccursale,
+        Idchauffeur: values.proprietaire_type === "chauffeur" ? values.Idchauffeur : null,
       };
 
       if (editingVehicle) {
@@ -146,6 +154,8 @@ export default function VehiculesPage() {
       Idsuccursale: vehicle.Idsuccursale ? vehicle.Idsuccursale.toString() : "global",
       CapacitePassagers: vehicle.capacite?.passagers.toString() || "0",
       Capacite: vehicle.capacite?.globale.toString() || "0",
+      proprietaire_type: vehicle.proprietaire_type || "agence",
+      Idchauffeur: vehicle.Idchauffeur ? vehicle.Idchauffeur.toString() : "",
     });
     setIsDialogOpen(true);
   };
@@ -387,6 +397,40 @@ export default function VehiculesPage() {
                 <FormField control={form.control} name="visiteTech" render={({ field }) => (
                   <FormItem><FormLabel className="text-xs font-bold uppercase text-muted-foreground">Visite Technique</FormLabel><FormControl><Input type="date" {...field} className="bg-muted/30 border-border" /></FormControl><FormMessage /></FormItem>
                 )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+                <FormField control={form.control} name="proprietaire_type" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Propriété du Véhicule</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        options={[
+                          { value: "agence", label: "Véhicule de l'Agence" },
+                          { value: "chauffeur", label: "Véhicule du Chauffeur" },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                {form.watch("proprietaire_type") === "chauffeur" && (
+                  <FormField control={form.control} name="Idchauffeur" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Chauffeur Propriétaire</FormLabel>
+                      <FormControl>
+                        <Combobox
+                          options={drivers.map(d => ({ value: d.chauffeur?.Idchauffeur?.toString() || d.id.toString(), label: d.name }))}
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
               </div>
 
               <DialogFooter className="pt-4 gap-2">

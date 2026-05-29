@@ -128,7 +128,11 @@ export interface Trip {
   load: string;                    // Description du fret
   agencyId: string;                // Cloisonnement multi-agence
   branchId: string | null;         // Succursale de départ
-  commissionAgency?: number;       // Frais payés à l'agence (CDF) si Partenaire
+  frais_fret?: number;             // Commission pour l'agence (CDF)
+  montant_chauffeur?: number;      // Ce que gagne le chauffeur
+  montant_agence?: number;         // Ce que gagne l'agence
+  paye_a?: "chauffeur" | "agence"; // Qui a reçu l'argent
+  PrixReel?: number;               // Prix réel de la course
 }
 
 // ============================================================================
