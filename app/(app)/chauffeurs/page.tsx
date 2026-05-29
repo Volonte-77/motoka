@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, User, Phone, Mail, BadgeCheck, MapPin } from "lucide-react";
-import { mockApi } from "@/lib/mock-api";
-import { AppUser, UserRole, Branch } from "@/types";
+import { Plus, Search, Edit2, Trash2, User, Phone, Mail, BadgeCheck, MapPin, Briefcase } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,14 +37,17 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
+import apiClient from "@/lib/api-client";
 
 const driverSchema = z.object({
   name: z.string().min(3, "Le nom est requis"),
   email: z.string().email("Email invalide"),
   phone: z.string().min(8, "Téléphone requis"),
   license: z.string().min(5, "Numéro de permis requis"),
-  vehicleAssigned: z.string().optional(),
-  status: z.enum(["Disponible", "Mission", "Maintenance", "Hors service"]),
+  type_contrat: z.enum(["salarie", "adherent"]),
+  commission: z.string().optional(),
+  salaireBase: z.string().optional(),
+  status: z.enum(["dispo", "en_course", "conge", "suspendu"]),
   branchId: z.string().optional(),
 });
 
@@ -54,11 +55,11 @@ type DriverFormValues = z.infer<typeof driverSchema>;
 
 export default function ChauffeursPage() {
   const { user } = useAuthStore();
-  const [drivers, setDrivers] = useState<AppUser[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingDriver, setEditingDriver] = useState<AppUser | null>(null);
+  const [editingDriver, setEditingDriver] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const form = useForm<DriverFormValues>({
@@ -68,70 +69,98 @@ export default function ChauffeursPage() {
       email: "",
       phone: "",
       license: "",
-      vehicleAssigned: "",
-      status: "Disponible",
+      type_contrat: "salarie",
+      commission: "10",
+      salaireBase: "0",
+      status: "dispo",
       branchId: "global",
     },
   });
 
   const loadData = async () => {
     setLoading(true);
-    const agencyId = user?.agencyId || null;
-    const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
-
-    const [driversData, branchesData] = await Promise.all([
-      mockApi.drivers.getAll(agencyId, branchId),
-      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
-    ]);
-    
-    setDrivers(driversData);
-    setBranches(branchesData);
-    setLoading(false);
+    try {
+      const [driversRes, branchesRes] = await Promise.all([
+        apiClient.get("/admin/chauffeurs"),
+        apiClient.get("/succursales")
+      ]);
+      setDrivers(driversRes.data.data || driversRes.data);
+      setBranches(branchesRes.data);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des chauffeurs");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, [user?.agencyId, user?.branchId, user?.role]);
+  }, []);
 
   const onSubmit = async (values: DriverFormValues) => {
     try {
-      const { branchId, ...rest } = values;
-      const selectedBranchName = branchId === "global" 
-        ? "Siège Social" 
-        : branches.find(b => b.id === branchId)?.name || "Succursale";
-
-      const driverData: AppUser = {
-        id: editingDriver?.id || Math.random().toString(36).substr(2, 9),
-        role: "Chauffeur" as UserRole,
-        agencyId: user?.agencyId || "default-agency",
-        siteAccess: selectedBranchName,
-        branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
-        ...rest,
+      setLoading(true);
+      const payload = {
+        name: values.name,
+        email: values.email,
+        telephone: values.phone,
+        numeroPermis: values.license,
+        statut_Enum: values.status,
+        type_contrat: values.type_contrat,
+        commission: parseFloat(values.commission || "0"),
+        salaireBase: parseFloat(values.salaireBase || "0"),
+        password: "password123", // Default for new, will be handled by backend usually
+        password_confirmation: "password123"
       };
 
-      await mockApi.drivers.save(driverData);
+      if (editingDriver) {
+        await apiClient.put(`/admin/chauffeurs/${editingDriver.id}`, payload);
+        toast.success("Chauffeur mis à jour");
+      } else {
+        await apiClient.post("/admin/chauffeurs", payload);
+        toast.success("Nouveau chauffeur enregistré");
+      }
+      
       await loadData();
       setIsDialogOpen(false);
       setEditingDriver(null);
       form.reset();
-      toast.success(editingDriver ? "Chauffeur mis à jour" : "Nouveau chauffeur enregistré");
-    } catch (error) {
-      toast.error("Erreur lors de l'enregistrement du chauffeur");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Erreur lors de l'enregistrement");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleEdit = (driver: AppUser) => {
+  const handleEdit = (driver: any) => {
     setEditingDriver(driver);
     form.reset({
       name: driver.name,
       email: driver.email,
-      phone: driver.phone || "",
-      license: driver.license || "",
-      vehicleAssigned: driver.vehicleAssigned || "",
-      status: (driver.status as any) || "Disponible",
+      phone: driver.chauffeur?.telephone || "",
+      license: driver.chauffeur?.numeroPermis || "",
+      type_contrat: driver.chauffeur?.type_contrat || "salarie",
+      commission: driver.chauffeur?.commission?.toString() || "10",
+      salaireBase: driver.chauffeur?.salaireBase?.toString() || "0",
+      status: driver.chauffeur?.statut_Enum || "dispo",
       branchId: driver.branchId || "global",
     });
     setIsDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "dispo":
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 uppercase text-[10px]">Disponible</Badge>;
+      case "en_course":
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 uppercase text-[10px]">En course</Badge>;
+      case "conge":
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 uppercase text-[10px]">En congé</Badge>;
+      case "suspendu":
+        return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 uppercase text-[10px]">Suspendu</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   const filteredDrivers = drivers.filter(
@@ -239,12 +268,25 @@ export default function ChauffeursPage() {
                     </TableCell>
                   )}
                   <TableCell>
+                    <div className="flex flex-col">
+                      <Badge variant="outline" className={
+                        driver.chauffeur?.type_contrat === "salarie" ? "border-zinc-500/50 text-zinc-500 bg-zinc-500/5" :
+                        "border-orange-500/50 text-orange-500 bg-orange-500/5"
+                      }>
+                        {driver.chauffeur?.type_contrat === "salarie" ? "Salarié" : "Adhérent"}
+                      </Badge>
+                      {driver.chauffeur?.type_contrat === "adherent" && (
+                        <span className="text-[9px] text-orange-600 font-bold mt-1">Frais Fret: {driver.chauffeur?.commission}%</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className={
-                      driver.status === "Disponible" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/5" :
-                      driver.status === "Mission" ? "border-blue-500/50 text-blue-500 bg-blue-500/5" :
+                      driver.chauffeur?.statut_Enum === "dispo" ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/5" :
+                      driver.chauffeur?.statut_Enum === "en_course" ? "border-blue-500/50 text-blue-500 bg-blue-500/5" :
                       "border-border text-muted-foreground bg-muted/50"
                     }>
-                      {driver.status || "Inactif"}
+                      {driver.chauffeur?.statut_Enum || "Inactif"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -349,10 +391,10 @@ export default function ChauffeursPage() {
                       <FormControl>
                         <Combobox
                           options={[
-                            { value: "Disponible", label: "Disponible" },
-                            { value: "Mission", label: "En mission" },
-                            { value: "Maintenance", label: "Maintenance" },
-                            { value: "Hors service", label: "Hors service" },
+                            { value: "dispo", label: "Disponible" },
+                            { value: "en_course", label: "En mission" },
+                            { value: "conge", label: "Congé" },
+                            { value: "suspendu", label: "Suspendu" },
                           ]}
                           value={field.value}
                           onChange={field.onChange}
@@ -362,6 +404,54 @@ export default function ChauffeursPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+                <FormField
+                  control={form.control}
+                  name="type_contrat"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Type de Contrat</FormLabel>
+                      <FormControl>
+                        <Combobox
+                          options={[
+                            { value: "salarie", label: "Salarié (Véhicule Agence)" },
+                            { value: "adherent", label: "Adhérent (Véhicule Propre)" },
+                          ]}
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {form.watch("type_contrat") === "adherent" ? (
+                  <FormField
+                    control={form.control}
+                    name="commission"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Frais Fret Agence (%)</FormLabel>
+                        <FormControl><Input type="number" {...field} className="bg-muted/30 border-border" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="salaireBase"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Salaire de Base (CDF)</FormLabel>
+                        <FormControl><Input type="number" {...field} className="bg-muted/30 border-border" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
               <DialogFooter className="pt-4 gap-2">
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="hover:bg-muted font-medium">Annuler</Button>
