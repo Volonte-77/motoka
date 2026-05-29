@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Printer } from "lucide-react";
-import { mockApi } from "@/lib/mock-api";
-import { Trip, TripStatus, Vehicle, AppUser, Branch, Agency } from "@/types";
+import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Printer, Wallet } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,129 +39,127 @@ import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
 import { useReactToPrint } from "react-to-print";
 import { A4Invoice } from "@/components/print/print-components";
+import apiClient from "@/lib/api-client";
 
 const tripSchema = z.object({
-  route: z.string().min(5, "L'itinéraire est requis"),
-  driverId: z.string().min(1, "Veuillez sélectionner un chauffeur"),
-  vehicleId: z.string().min(1, "Veuillez sélectionner un véhicule"),
+  nomCourse: z.string().min(5, "L'itinéraire est requis"),
+  Idchauffeur: z.string().min(1, "Veuillez sélectionner un chauffeur"),
+  Idvehicule: z.string().min(1, "Veuillez sélectionner un véhicule"),
   departureTime: z.string().min(1, "L'heure de départ est requise"),
-  eta: z.string().optional(),
+  PrixReel: z.string().min(1, "Le prix est requis"),
+  paye_a: z.enum(["chauffeur", "agence"]),
   passengers: z.preprocess((val) => Number(val), z.number().min(0)),
   load: z.string().optional(),
-  status: z.enum(["Planifiée", "En cours", "Terminée", "Annulée"]),
-  branchId: z.string().optional(),
+  statut_enum: z.enum(["en_attente", "en_cours", "termine", "annulee"]),
+  Idsuccursale: z.string().optional(),
 });
 
 type TripFormValues = z.infer<typeof tripSchema>;
 
 export default function CoursesPage() {
   const { user } = useAuthStore();
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState<AppUser[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [agency, setAgency] = useState<Agency | null>(null);
+  const [trips, setTrips] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isClient, setIsClient] = useState(false);
 
-  // ÉTATS POUR L'IMPRESSION CIBLÉE (A4)
   const printRef = useRef<HTMLDivElement>(null);
-  const [selectedTripForPrint, setSelectedTripForPrint] = useState<Trip | null>(null);
+  const [selectedTripForPrint, setSelectedTripForPrint] = useState<any | null>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Ticket_Course_${selectedTripForPrint?.id}`,
   });
 
-  const triggerPrint = (trip: Trip) => {
+  const triggerPrint = (trip: any) => {
     setSelectedTripForPrint(trip);
     setTimeout(() => {
       handlePrint();
     }, 150);
   };
 
-  useEffect(() => { setIsClient(true); }, []);
-
   const form = useForm<TripFormValues>({
     resolver: zodResolver(tripSchema),
     defaultValues: {
-      route: "",
-      driverId: "",
-      vehicleId: "",
+      nomCourse: "",
+      Idchauffeur: "",
+      Idvehicule: "",
       departureTime: new Date().toISOString().slice(0, 16),
-      eta: "Env. 4 heures",
+      PrixReel: "0",
+      paye_a: "chauffeur",
       passengers: 0,
       load: "",
-      status: "Planifiée",
-      branchId: "global",
+      statut_enum: "en_attente",
+      Idsuccursale: "global",
     },
   });
 
   const loadData = async () => {
     setLoading(true);
-    const agencyId = user?.agencyId || null;
-    const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
+    try {
+      const [tripsRes, vehRes, driversRes, branchesRes] = await Promise.all([
+        apiClient.get("/courses"),
+        apiClient.get("/vehicules/disponibles"),
+        apiClient.get("/admin/chauffeurs"),
+        apiClient.get("/succursales")
+      ]);
 
-    const [tripsData, vehiclesData, driversData, branchesData, agenciesData] = await Promise.all([
-      mockApi.trips.getAll(agencyId, branchId),
-      mockApi.vehicles.getAll(agencyId, branchId),
-      mockApi.drivers.getAll(agencyId, branchId),
-      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([]),
-      mockApi.agencies.getAll()
-    ]);
-
-    setTrips(tripsData);
-    setVehicles(vehiclesData.filter(v => v.status === "Disponible"));
-    setDrivers(driversData.filter(d => d.status === "Disponible"));
-    setBranches(branchesData);
-    if (agencyId) {
-      setAgency(agenciesData.find(a => a.id === agencyId) || null);
+      setTrips(tripsRes.data.data || tripsRes.data);
+      setVehicles(vehRes.data.data || vehRes.data);
+      setDrivers(driversRes.data.data || driversRes.data);
+      setBranches(branchesRes.data);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-  }, [user?.agencyId, user?.branchId, user?.role]);
+  }, []);
 
   const onSubmit = async (values: TripFormValues) => {
     try {
-      const { branchId, ...rest } = values;
-      const selectedDriver = drivers.find(d => d.id === values.driverId);
-      const selectedVehicle = vehicles.find(v => v.id === values.vehicleId);
-
-      const tripData: Trip = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...rest,
-        driver: selectedDriver?.name || "Inconnu",
-        vehicle: selectedVehicle ? `${selectedVehicle.model} (${selectedVehicle.plate})` : "Inconnu",
-        agencyId: user?.agencyId || "default-agency",
-        branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
+      setLoading(true);
+      const payload = {
+        ...values,
+        PrixReel: parseFloat(values.PrixReel),
+        PrixEstime: parseFloat(values.PrixReel),
+        AdresseDepart: values.nomCourse.split("→")[0]?.trim() || "Départ",
+        AdresseArrive: values.nomCourse.split("→")[1]?.trim() || "Arrivée",
+        LatitudeDepart: 0, LongitudeDepart: 0, LatitudeArrivee: 0, LongitudeArrive: 0,
+        Distance_Km: 0,
+        Idclient: 1, // Default or select client
+        Idsuccursale: values.Idsuccursale === "global" ? null : values.Idsuccursale,
       };
 
-      await mockApi.trips.save(tripData);
+      await apiClient.post("/courses", payload);
       await loadData();
       setIsDialogOpen(false);
       form.reset();
       toast.success("Course planifiée avec succès");
-    } catch (error) {
-      toast.error("Erreur lors de la planification de la course");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Erreur lors de l'enregistrement");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: TripStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Planifiée": return <Badge variant="outline" className="border-blue-500/50 text-blue-500 bg-blue-500/5">Planifiée</Badge>;
-      case "En cours": return <Badge className="bg-amber-500 text-white border-none font-bold">En cours</Badge>;
-      case "Terminée": return <Badge className="bg-emerald-500 text-white border-none font-bold">Terminée</Badge>;
-      case "Annulée": return <Badge variant="destructive" className="font-bold">Annulée</Badge>;
+      case "en_attente": return <Badge variant="outline" className="border-blue-500/50 text-blue-500 bg-blue-500/5">Planifiée</Badge>;
+      case "en_cours": return <Badge className="bg-amber-500 text-white border-none font-bold">En cours</Badge>;
+      case "termine": return <Badge className="bg-emerald-500 text-white border-none font-bold">Terminée</Badge>;
+      case "annulee": return <Badge variant="destructive" className="font-bold">Annulée</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
 
-  const filteredTrips = trips.filter(t => t.route.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredTrips = trips.filter(t => t.nomCourse?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6">
