@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2 } from "lucide-react";
+import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Download } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
-import { Trip, TripStatus, Vehicle, AppUser, Branch } from "@/types";
+import { Trip, TripStatus, Vehicle, AppUser, Branch, Agency } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/form";
 import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { TripTicket } from "@/components/print-templates";
 
 const tripSchema = z.object({
   route: z.string().min(5, "L'itinéraire est requis"),
@@ -60,9 +62,13 @@ export default function CoursesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<AppUser[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [agency, setAgency] = useState<Agency | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => { setIsClient(true); }, []);
 
   const form = useForm<TripFormValues>({
     resolver: zodResolver(tripSchema),
@@ -84,17 +90,21 @@ export default function CoursesPage() {
     const agencyId = user?.agencyId || null;
     const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
 
-    const [tripsData, vehiclesData, driversData, branchesData] = await Promise.all([
+    const [tripsData, vehiclesData, driversData, branchesData, agenciesData] = await Promise.all([
       mockApi.trips.getAll(agencyId, branchId),
       mockApi.vehicles.getAll(agencyId, branchId),
       mockApi.drivers.getAll(agencyId, branchId),
-      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
+      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([]),
+      mockApi.agencies.getAll()
     ]);
 
     setTrips(tripsData);
     setVehicles(vehiclesData.filter(v => v.status === "Disponible"));
     setDrivers(driversData.filter(d => d.status === "Disponible"));
     setBranches(branchesData);
+    if (agencyId) {
+      setAgency(agenciesData.find(a => a.id === agencyId) || null);
+    }
     setLoading(false);
   };
 
@@ -219,7 +229,21 @@ export default function CoursesPage() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           {getStatusBadge(trip.status)}
-                          <ChevronRight size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                          <div className="flex items-center gap-2">
+                            {isClient && agency && (
+                              <PDFDownloadLink
+                                document={<TripTicket trip={trip} agency={agency} />}
+                                fileName={`Ticket_Course_${trip.id}.pdf`}
+                              >
+                                {({ loading }) => (
+                                  <Button variant="outline" size="icon" className="h-8 w-8 border-border hover:bg-primary hover:text-white" disabled={loading} onClick={(e) => e.stopPropagation()}>
+                                    <Download size={14} />
+                                  </Button>
+                                )}
+                              </PDFDownloadLink>
+                            )}
+                            <ChevronRight size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -4,10 +4,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Search, Package as PackageIcon, User, Phone, 
   MapPin, QrCode, ShieldCheck, LayoutGrid, List, Filter,
-  History, ArchiveRestore, Clock, ChevronRight
+  History, ArchiveRestore, Clock, ChevronRight, Download
 } from "lucide-react";
 import { mockApi } from "@/lib/mock-api";
-import { Package, PackageStatus, Branch } from "@/types";
+import { Package, PackageStatus, Branch, Agency } from "@/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,7 +46,6 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { PackageReceipt } from "@/components/print-templates";
-import { Agency } from "@/types";
 
 const packageSchema = z.object({
   sender: z.string().min(3, "Expéditeur requis"),
@@ -109,9 +108,6 @@ export default function ColisPage() {
     if (agencyId) {
       setAgency(agenciesData.find(a => a.id === agencyId) || null);
     }
-    setLoading(false);
-  };
-
     setLoading(false);
   };
 
@@ -303,9 +299,23 @@ export default function ColisPage() {
                       )}
                       <TableCell>{getStatusBadge(pkg.status)}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10">
-                          <ShieldCheck size={12} /> {pkg.otp}
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10">
+                            <ShieldCheck size={12} /> {pkg.otp}
+                          </Button>
+                          {isClient && agency && (
+                            <PDFDownloadLink
+                              document={<PackageReceipt pkg={pkg} agency={agency} />}
+                              fileName={`Recu_Colis_${pkg.id}.pdf`}
+                            >
+                              {({ loading }) => (
+                                <Button variant="outline" size="icon" className="h-8 w-8 border-border hover:bg-primary hover:text-white" disabled={loading}>
+                                  <Download size={14} />
+                                </Button>
+                              )}
+                            </PDFDownloadLink>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -344,9 +354,23 @@ export default function ColisPage() {
                       <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/5 px-2 py-1 rounded-md border border-emerald-500/10">
                         <ShieldCheck size={14} /> {pkg.otp}
                       </div>
-                      <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-border bg-muted/50 hover:bg-primary hover:text-primary-foreground font-bold transition-all">
-                        <QrCode size={12} /> ÉTIQUETTE
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {isClient && agency && (
+                          <PDFDownloadLink
+                            document={<PackageReceipt pkg={pkg} agency={agency} />}
+                            fileName={`Recu_Colis_${pkg.id}.pdf`}
+                          >
+                            {({ loading }) => (
+                              <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-border bg-muted/50 hover:bg-primary hover:text-primary-foreground font-bold transition-all" disabled={loading}>
+                                <Download size={12} /> REÇU
+                              </Button>
+                            )}
+                          </PDFDownloadLink>
+                        )}
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-border bg-muted/50 hover:bg-primary hover:text-primary-foreground font-bold transition-all">
+                          <QrCode size={12} /> ÉTIQUETTE
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
