@@ -78,6 +78,8 @@ export default function DashboardPage() {
     fetchBranchData();
   }, [user]);
 
+  const [revenueData, setRevenueData] = useState<{ day: string, amount: number }[]>([]);
+
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
@@ -103,6 +105,25 @@ export default function DashboardPage() {
         trips: t.length,
         revenue
       });
+
+      // Calculer les données du graphique (7 derniers jours)
+      const last7Days = Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return {
+          dateStr: d.toISOString().split('T')[0],
+          label: d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')
+        };
+      });
+
+      const chartData = last7Days.map(day => {
+        const dayRevenue = c
+          .filter(tx => tx.timestamp.split('T')[0] === day.dateStr && tx.type === "Entrée")
+          .reduce((acc, curr) => acc + curr.amount, 0);
+        return { day: day.label, amount: dayRevenue };
+      });
+
+      setRevenueData(chartData);
       setLoading(false);
     };
     loadStats();
