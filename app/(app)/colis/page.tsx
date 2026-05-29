@@ -44,6 +44,9 @@ import {
 import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { PackageReceipt } from "@/components/print-templates";
+import { Agency } from "@/types";
 
 const packageSchema = z.object({
   sender: z.string().min(3, "Expéditeur requis"),
@@ -63,10 +66,14 @@ export default function ColisPage() {
   const { user } = useAuthStore();
   const [packages, setPackages] = useState<Package[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [agency, setAgency] = useState<Agency | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => { setIsClient(true); }, []);
+
   // Nouveaux états pour l'affichage intelligent
   const [displayMode, setDisplayMode] = useState<"table" | "grid">("table");
   const [showArchived, setShowArchived] = useState(false); // Par défaut on ne montre pas l'historique
@@ -91,13 +98,20 @@ export default function ColisPage() {
     const agencyId = user?.agencyId || null;
     const branchId = user?.role === "Admin Succursale" ? user.branchId : null;
 
-    const [packagesData, branchesData] = await Promise.all([
+    const [packagesData, branchesData, agenciesData] = await Promise.all([
       mockApi.packages.getAll(agencyId, branchId),
-      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([])
+      user?.agencyId ? mockApi.agencies.getBranches(user.agencyId) : Promise.resolve([]),
+      mockApi.agencies.getAll()
     ]);
 
     setPackages(packagesData);
     setBranches(branchesData);
+    if (agencyId) {
+      setAgency(agenciesData.find(a => a.id === agencyId) || null);
+    }
+    setLoading(false);
+  };
+
     setLoading(false);
   };
 
