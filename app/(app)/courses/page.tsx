@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Printer, Wallet } from "lucide-react";
+import { Plus, Search, MapPin, Calendar, Users as UsersIcon, ChevronRight, MoreHorizontal, Clock, Building2, Printer, Wallet, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useForm } from "react-hook-form";
+import { useForm, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -62,6 +62,7 @@ export default function CoursesPage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [agency, setAgency] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,14 +76,23 @@ export default function CoursesPage() {
   });
 
   const triggerPrint = (trip: any) => {
-    setSelectedTripForPrint(trip);
+    // Adapter le trip pour A4Invoice (normalisation)
+    const normalizedTrip = {
+      ...trip,
+      route: trip.nomCourse || trip.route,
+      driver: trip.chauffeur?.nomChauffeur || trip.driver || "Inconnu",
+      vehicle: trip.vehicule ? `${trip.vehicule.modele} (${trip.vehicule.immatriculation})` : (trip.vehicle || "Inconnu"),
+      departureTime: trip.departureTime || "",
+      passengers: trip.passengers || 0,
+    };
+    setSelectedTripForPrint(normalizedTrip);
     setTimeout(() => {
       handlePrint();
     }, 150);
   };
 
   const form = useForm<TripFormValues>({
-    resolver: zodResolver(tripSchema),
+    resolver: zodResolver(tripSchema) as Resolver<TripFormValues>,
     defaultValues: {
       nomCourse: "",
       Idchauffeur: "",
