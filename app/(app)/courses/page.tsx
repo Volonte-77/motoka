@@ -100,17 +100,19 @@ export default function CoursesPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tripsRes, vehRes, driversRes, branchesRes] = await Promise.all([
+      const [tripsRes, vehRes, driversRes, branchesRes, agencyRes] = await Promise.all([
         apiClient.get("/courses"),
         apiClient.get("/vehicules/disponibles"),
         apiClient.get("/admin/chauffeurs"),
-        apiClient.get("/succursales")
+        apiClient.get("/succursales"),
+        apiClient.get("/agence")
       ]);
 
       setTrips(tripsRes.data.data || tripsRes.data);
       setVehicles(vehRes.data.data || vehRes.data);
       setDrivers(driversRes.data.data || driversRes.data);
       setBranches(branchesRes.data);
+      setAgency(agencyRes.data);
     } catch (error) {
       toast.error("Erreur lors du chargement des données");
     } finally {
@@ -220,24 +222,41 @@ export default function CoursesPage() {
                             <MapPin size={18} />
                           </div>
                           <div>
-                            <span className="font-bold text-lg text-foreground tracking-tight">{trip.route}</span>
+                            <span className="font-bold text-lg text-foreground tracking-tight">{trip.nomCourse}</span>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                          <div className="flex items-center gap-1.5"><Clock size={12} /> {trip.departureTime.replace("T", " à ")}</div>
-                          <div className="flex items-center gap-1.5"><UsersIcon size={12} /> {trip.passengers} PAX</div>
+                          <div className="flex items-center gap-1.5"><Clock size={12} /> {trip.departureTime?.replace("T", " à ")}</div>
+                          <div className="flex items-center gap-1.5"><UsersIcon size={12} /> {trip.passengers || 0} PAX</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-right hidden md:block">
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{trip.driver}</p>
-                          <p className="text-[10px] text-zinc-400 font-mono">{trip.vehicle}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                            {trip.chauffeur?.nomChauffeur || "Chauffeur Inconnu"}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 font-mono">
+                            {trip.vehicule?.modele} ({trip.vehicule?.immatriculation})
+                          </p>
+                          <div className="mt-1 flex items-center justify-end gap-2">
+                            <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-600 bg-emerald-50/50">
+                              Chauffeur: {trip.montant_chauffeur?.toLocaleString()} CDF
+                            </Badge>
+                            <Badge variant="outline" className="text-[9px] border-primary/30 text-primary bg-primary/5">
+                              Agence: {trip.montant_agence?.toLocaleString()} CDF
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(trip.status)}
-                          <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-primary hover:text-white" onClick={(e) => { e.stopPropagation(); triggerPrint(trip); }}>
-                            <Printer size={14} />
-                          </Button>
+                          {getStatusBadge(trip.statut_enum)}
+                          <div className="flex gap-2">
+                            <Badge variant="outline" className={trip.paye_a === "agence" ? "border-primary/50 text-primary bg-primary/5" : "border-orange-500/50 text-orange-600 bg-orange-500/5"}>
+                              <Wallet size={10} className="mr-1" /> {trip.paye_a === "agence" ? "Caisse Agence" : "Direct Chauffeur"}
+                            </Badge>
+                            <Button variant="outline" size="icon" className="h-8 w-8 hover:bg-primary hover:text-white" onClick={(e) => { e.stopPropagation(); triggerPrint(trip); }}>
+                              <Printer size={14} />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
