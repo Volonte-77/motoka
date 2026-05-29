@@ -103,32 +103,51 @@ export default function RapportsPage() {
 
   useEffect(() => { setIsClient(true); }, []);
 
+  const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+
   useEffect(() => {
     const init = async () => {
       if (user?.agencyId) {
         const branchList = await mockApi.agencies.getBranches(user.agencyId);
         setBranches(branchList);
+        
+        const effectiveBranchId = user.role === "Admin Succursale" 
+          ? user.branchId 
+          : (selectedBranchId === "all" ? null : selectedBranchId);
+          
+        const txs = await mockApi.cash.getAll(user.agencyId, effectiveBranchId);
+        setTransactions(txs);
         setLoading(false);
       }
     };
     init();
-  }, [user]);
+  }, [user, selectedBranchId]);
 
   const reportData = useMemo(() => {
     const currentBranchName = selectedBranchId === "all" ? "Toutes les succursales" : branches.find(b => b.id === selectedBranchId)?.name || "Siège Social";
+    
+    const sortedTxs = [...transactions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    const totals = transactions.reduce((acc, curr) => {
+      if (curr.type === "Entrée") acc.in += curr.amount;
+      else acc.out += curr.amount;
+      return acc;
+    }, { in: 0, out: 0 });
+
     return {
       agencyName: "Kasongo Express",
       branchName: currentBranchName,
       date: new Date().toLocaleDateString("fr-FR", { day: 'numeric', month: 'long', year: 'numeric' }),
-      totals: { in: 660000, out: 210000 },
-      transactions: [
-        { id: "TX-001", desc: "Vente billets Goma-Bukavu", cat: "Billet", amount: 450000, type: "Entrée" },
-        { id: "TX-002", desc: "Maintenance Bus Coaster", cat: "Entretien", amount: 125000, type: "Sortie" },
-        { id: "TX-003", desc: "Frais de douane Fret", cat: "Logistique", amount: 85000, type: "Sortie" },
-        { id: "TX-004", desc: "Recette Colis Express", cat: "Fret", amount: 210000, type: "Entrée" },
-      ]
+      totals: totals,
+      transactions: sortedTxs.slice(0, 10).map(t => ({
+        id: t.id.toUpperCase(),
+        desc: t.description,
+        cat: t.category,
+        amount: t.amount,
+        type: t.type
+      }))
     };
-  }, [selectedBranchId, branches]);
+  }, [selectedBranchId, branches, transactions]);
 
   const ReportPreview = () => (
     <div className="bg-zinc-100 dark:bg-zinc-950 p-4 md:p-8 rounded-2xl border border-border shadow-inner min-h-[600px] animate-in fade-in zoom-in-95 duration-300">
