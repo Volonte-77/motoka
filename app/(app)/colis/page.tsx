@@ -160,6 +160,8 @@ export default function ColisPage() {
         branchId: user?.role === "Admin Succursale" ? user.branchId : (branchId === "global" ? null : branchId || null),
         weight: rest.weight ?? "1kg",
         value: rest.value ?? "0 FCFA",
+        price: 0,
+        paymentMode: "Agence",
         ...rest,
       };
 
