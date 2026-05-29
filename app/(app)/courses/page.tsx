@@ -264,23 +264,100 @@ export default function CoursesPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader><DialogTitle>Planification Course</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-[600px] bg-card border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold tracking-tight">Planification Course</DialogTitle>
+            <DialogDescription>Détails du trajet et assignation opérationnelle.</DialogDescription>
+          </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <FormField control={form.control} name="route" render={({ field }) => (
-                <FormItem><FormLabel className="text-xs uppercase font-bold">Itinéraire</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="nomCourse" render={({ field }) => (
+                <FormItem><FormLabel className="text-xs uppercase font-bold text-muted-foreground">Itinéraire (Ex: Goma → Butembo)</FormLabel><FormControl><Input placeholder="Goma → Butembo" {...field} className="bg-muted/30 border-border font-bold" /></FormControl><FormMessage /></FormItem>
               )} />
+              
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="driverId" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs uppercase font-bold">Chauffeur</FormLabel><FormControl><Combobox options={drivers.map(d => ({ value: d.id, label: d.name }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="Idchauffeur" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Chauffeur</FormLabel>
+                    <FormControl>
+                      <Combobox 
+                        options={drivers.map(d => ({ value: d.chauffeur?.Idchauffeur?.toString() || d.id.toString(), label: d.name }))} 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
-                <FormField control={form.control} name="vehicleId" render={({ field }) => (
-                  <FormItem><FormLabel className="text-xs uppercase font-bold">Véhicule</FormLabel><FormControl><Combobox options={vehicles.map(v => ({ value: v.id, label: `${v.model} (${v.plate})` }))} value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="Idvehicule" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Véhicule</FormLabel>
+                    <FormControl>
+                      <Combobox 
+                        options={vehicles.map(v => ({ value: v.id.toString(), label: `${v.modele} (${v.immatriculation})` }))} 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
-              <DialogFooter>
-                <Button type="submit" className="w-full font-bold">Confirmer le départ</Button>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="PrixReel" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Prix du Trajet (CDF)</FormLabel>
+                    <FormControl><Input type="number" {...field} className="bg-muted/30 border-border font-bold text-primary" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="paye_a" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Paiement reçu par</FormLabel>
+                    <FormControl>
+                      <Combobox 
+                        options={[
+                          { value: "chauffeur", label: "Directement au Chauffeur" },
+                          { value: "agence", label: "À la Caisse de l'Agence" },
+                        ]} 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="departureTime" render={({ field }) => (
+                  <FormItem><FormLabel className="text-xs uppercase font-bold text-muted-foreground">Date & Heure de Départ</FormLabel><FormControl><Input type="datetime-local" {...field} className="bg-muted/30 border-border" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="statut_enum" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Statut</FormLabel>
+                    <FormControl>
+                      <Combobox 
+                        options={[
+                          { value: "en_attente", label: "Planifiée / En attente" },
+                          { value: "en_cours", label: "En cours de route" },
+                          { value: "termine", label: "Arrivée / Terminée" },
+                        ]} 
+                        value={field.value} 
+                        onChange={field.onChange} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <DialogFooter className="pt-4">
+                <Button type="submit" className="w-full font-bold bg-primary text-primary-foreground hover:bg-primary/90 py-6 text-lg" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmer la Planification
+                </Button>
               </DialogFooter>
             </form>
           </Form>
